@@ -1,4 +1,4 @@
-String describeEnum(Object enumEntry) {
+String pDescribeEnum(Object enumEntry) {
   if (enumEntry is Enum) {
     return enumEntry.name;
   }

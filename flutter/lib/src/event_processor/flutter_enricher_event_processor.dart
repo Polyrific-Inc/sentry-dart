@@ -141,16 +141,16 @@ class FlutterEnricherEventProcessor implements EventProcessor {
     return <String, String>{
       'has_render_view': hasRenderView.toString(),
       if (tempDebugBrightnessOverride != null)
-        'debug_brightness_override': describeEnum(tempDebugBrightnessOverride),
+        'debug_brightness_override': pDescribeEnum(tempDebugBrightnessOverride),
       if (debugPlatformOverride != null)
         'debug_default_target_platform_override':
-            describeEnum(debugPlatformOverride),
+            pDescribeEnum(debugPlatformOverride),
       if (initialLifecycleState != null && initialLifecycleState.isNotEmpty)
         'initial_lifecycle_state': initialLifecycleState,
       if (defaultRouteName != null && defaultRouteName.isNotEmpty)
         'default_route_name': defaultRouteName,
       if (currentLifecycle != null)
-        'current_lifecycle_state': describeEnum(currentLifecycle),
+        'current_lifecycle_state': pDescribeEnum(currentLifecycle),
       // Seems to always return false.
       // Also always fails in tests.
       // See https://github.com/flutter/flutter/issues/83919
@@ -197,7 +197,7 @@ class FlutterEnricherEventProcessor implements EventProcessor {
   SentryOperatingSystem _getOperatingSystem(SentryOperatingSystem? os) {
     return (os ?? SentryOperatingSystem()).copyWith(
       // ignore: deprecated_member_use
-      theme: os?.theme ?? describeEnum(window.platformBrightness),
+      theme: os?.theme ?? pDescribeEnum(window.platformBrightness),
     );
   }
 
