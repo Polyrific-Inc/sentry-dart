@@ -1,8 +1,10 @@
 @TestOn('browser')
-import 'dart:html' as html;
+library dart_test;
 
 import 'package:sentry/sentry.dart';
-import 'package:sentry/src/event_processor/enricher/web_enricher_event_processor.dart';
+import 'package:sentry/src/event_processor/enricher/html_enricher_event_processor.dart'
+    if (dart.library.html) 'package:sentry/src/event_processor/enricher/html_enricher_event_processor.dart'
+    if (dart.library.js_interop) 'package:sentry/src/event_processor/enricher/web_enricher_event_processor.dart';
 import 'package:test/test.dart';
 
 import '../../mocks.dart';
@@ -20,21 +22,21 @@ void main() {
 
     test('add path as transaction if transaction is null', () {
       var enricher = fixture.getSut();
-      final event = enricher.apply(SentryEvent());
+      final event = enricher.apply(SentryEvent(), Hint());
 
       expect(event?.transaction, isNotNull);
     });
 
     test("don't overwrite transaction", () {
       var enricher = fixture.getSut();
-      final event = enricher.apply(SentryEvent(transaction: 'foobar'));
+      final event = enricher.apply(SentryEvent(transaction: 'foobar'), Hint());
 
       expect(event?.transaction, 'foobar');
     });
 
     test('add request with user-agent header', () {
       var enricher = fixture.getSut();
-      final event = enricher.apply(SentryEvent());
+      final event = enricher.apply(SentryEvent(), Hint());
 
       expect(event?.request?.headers['User-Agent'], isNotNull);
       expect(event?.request?.url, isNotNull);
@@ -50,7 +52,7 @@ void main() {
         ),
       );
       var enricher = fixture.getSut();
-      event = enricher.apply(event)!;
+      event = enricher.apply(event, Hint())!;
 
       expect(event.request?.headers['User-Agent'], isNotNull);
       expect(event.request?.headers['foo'], 'bar');
@@ -68,7 +70,7 @@ void main() {
         ),
       );
       var enricher = fixture.getSut();
-      event = enricher.apply(event)!;
+      event = enricher.apply(event, Hint())!;
 
       expect(event.request?.headers['Authorization'], isNull);
       expect(event.request?.headers['authorization'], isNull);
@@ -84,7 +86,7 @@ void main() {
         ),
       );
       var enricher = fixture.getSut();
-      event = enricher.apply(event)!;
+      event = enricher.apply(event, Hint())!;
 
       expect(event.request?.headers['User-Agent'], 'best browser agent');
       expect(event.request?.url, 'foo.bar');
@@ -92,14 +94,14 @@ void main() {
 
     test('adds device and os', () {
       var enricher = fixture.getSut();
-      final event = enricher.apply(SentryEvent());
+      final event = enricher.apply(SentryEvent(), Hint());
 
       expect(event?.contexts.device, isNotNull);
     });
 
     test('adds Dart context', () {
       final enricher = fixture.getSut();
-      final event = enricher.apply(SentryEvent());
+      final event = enricher.apply(SentryEvent(), Hint());
 
       final dartContext = event?.contexts['dart_context'];
       expect(dartContext, isNotNull);
@@ -108,14 +110,14 @@ void main() {
 
     test('device has screendensity', () {
       var enricher = fixture.getSut();
-      final event = enricher.apply(SentryEvent());
+      final event = enricher.apply(SentryEvent(), Hint());
 
       expect(event?.contexts.device?.screenDensity, isNotNull);
     });
 
     test('culture has timezone', () {
       var enricher = fixture.getSut();
-      final event = enricher.apply(SentryEvent());
+      final event = enricher.apply(SentryEvent(), Hint());
 
       expect(event?.contexts.culture?.timezone, isNotNull);
     });
@@ -142,7 +144,7 @@ void main() {
 
       final enricher = fixture.getSut();
 
-      final event = enricher.apply(fakeEvent);
+      final event = enricher.apply(fakeEvent, Hint());
 
       // contexts.device
       expect(
@@ -191,10 +193,8 @@ void main() {
       );
       await Sentry.close();
 
-      final ioEnricherCount = sentryOptions.eventProcessors
-          .whereType<WebEnricherEventProcessor>()
-          .length;
-      expect(ioEnricherCount, 1);
+      expect(sentryOptions.eventProcessors.map((e) => e.runtimeType.toString()),
+          contains('$WebEnricherEventProcessor'));
     });
   });
 }
@@ -204,10 +204,6 @@ class Fixture {
     final options = SentryOptions(
         dsn: fakeDsn,
         checker: MockPlatformChecker(hasNativeIntegration: false));
-
-    return WebEnricherEventProcessor(
-      html.window,
-      options,
-    );
+    return enricherEventProcessor(options) as WebEnricherEventProcessor;
   }
 }

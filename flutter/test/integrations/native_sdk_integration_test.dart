@@ -1,105 +1,66 @@
 @TestOn('vm')
+library flutter_test;
 
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_flutter/src/integrations/native_sdk_integration.dart';
 
-import '../mocks.dart';
 import '../mocks.mocks.dart';
+import 'fixture.dart';
 
 void main() {
-  const _channel = MethodChannel('sentry_flutter');
+  group(NativeSdkIntegration, () {
+    late IntegrationTestFixture<NativeSdkIntegration> fixture;
 
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  late Fixture fixture;
-
-  setUp(() {
-    fixture = Fixture();
-  });
-
-  tearDown(() {
-    // ignore: deprecated_member_use
-    _channel.setMockMethodCallHandler(null);
-  });
-
-  test('nativeSdkIntegration adds integration', () async {
-    // ignore: deprecated_member_use
-    _channel.setMockMethodCallHandler((MethodCall methodCall) async {});
-
-    final integration = NativeSdkIntegration(_channel);
-
-    await integration(fixture.hub, fixture.options);
-
-    expect(fixture.options.sdk.integrations.contains('nativeSdkIntegration'),
-        true);
-  });
-
-  test('nativeSdkIntegration do not throw', () async {
-    // ignore: deprecated_member_use
-    _channel.setMockMethodCallHandler((MethodCall methodCall) async {
-      throw Exception();
+    setUp(() {
+      fixture = IntegrationTestFixture(NativeSdkIntegration.new);
     });
 
-    final integration = NativeSdkIntegration(_channel);
-
-    await integration(fixture.hub, fixture.options);
-
-    expect(fixture.options.sdk.integrations.contains('nativeSdkIntegration'),
-        false);
-  });
-
-  test('nativeSdkIntegration closes native SDK', () async {
-    var closeCalled = false;
-    // ignore: deprecated_member_use
-    _channel.setMockMethodCallHandler((MethodCall methodCall) async {
-      expect(methodCall.method, 'closeNativeSdk');
-      closeCalled = true;
+    test('adds integration', () async {
+      await fixture.registerIntegration();
+      expect(
+          fixture.options.sdk.integrations, contains('nativeSdkIntegration'));
+      verify(fixture.binding.init(any)).called(1);
     });
 
-    final integration = NativeSdkIntegration(_channel);
-
-    await integration.close();
-
-    expect(closeCalled, true);
-  });
-
-  test('nativeSdkIntegration does not call native sdk when auto init disabled',
-      () async {
-    var methodChannelCalled = false;
-    // ignore: deprecated_member_use
-    _channel.setMockMethodCallHandler((MethodCall methodCall) async {
-      methodChannelCalled = true;
+    test('do not throw', () async {
+      fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
+      await fixture.registerIntegration();
+      expect(fixture.options.sdk.integrations.contains('nativeSdkIntegration'),
+          false);
     });
-    fixture.options.autoInitializeNativeSdk = false;
 
-    final integration = NativeSdkIntegration(_channel);
-
-    await integration.call(fixture.hub, fixture.options);
-
-    expect(methodChannelCalled, false);
-  });
-
-  test('nativeSdkIntegration does not close native when auto init disabled',
-      () async {
-    var methodChannelCalled = false;
-    // ignore: deprecated_member_use
-    _channel.setMockMethodCallHandler((MethodCall methodCall) async {
-      methodChannelCalled = true;
+    test('closes native SDK', () async {
+      await fixture.registerIntegration();
+      await fixture.sut.close();
+      verify(fixture.binding.close()).called(1);
     });
-    fixture.options.autoInitializeNativeSdk = false;
 
-    final integration = NativeSdkIntegration(_channel);
+    test('does not call native sdk when auto init disabled', () async {
+      fixture.options.autoInitializeNativeSdk = false;
+      await fixture.registerIntegration();
+      verifyNever(fixture.binding.init(any));
+    });
 
-    await integration(fixture.hub, fixture.options);
-    await integration.close();
+    test('does not close native when auto init disabled', () async {
+      fixture.options.autoInitializeNativeSdk = false;
+      await fixture.registerIntegration();
+      await fixture.sut.close();
+      verifyNever(fixture.binding.close());
+    });
 
-    expect(methodChannelCalled, false);
+    test(' is not added in case of an exception', () async {
+      fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
+      await fixture.registerIntegration();
+      expect(fixture.options.sdk.integrations, <String>[]);
+    });
   });
 }
 
-class Fixture {
-  final hub = MockHub();
-  final options = SentryFlutterOptions(dsn: fakeDsn);
+class _ThrowingMockSentryNative extends MockSentryNativeBinding {
+  @override
+  Future<void> init(SentryFlutterOptions? options) async {
+    throw Exception();
+  }
 }

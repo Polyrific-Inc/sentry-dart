@@ -1,4 +1,5 @@
 @TestOn('vm')
+library dart_test;
 
 import 'package:sentry/sentry.dart';
 import 'package:test/test.dart';
@@ -53,6 +54,23 @@ void main() {
       await Future.delayed(Duration(milliseconds: 10));
 
       expect(onErrorCalled, true);
+    });
+
+    test('sets level to error instead of fatal', () async {
+      final exception = StateError('error');
+      final stackTrace = StackTrace.current;
+
+      final hub = Hub(fixture.options);
+      final client = MockSentryClient();
+      hub.bindClient(client);
+
+      final sut = fixture.getSut(runner: () async {});
+
+      fixture.options.markAutomaticallyCollectedErrorsAsFatal = false;
+      await sut.captureError(hub, fixture.options, exception, stackTrace);
+
+      final capturedEvent = client.captureEventCalls.last.event;
+      expect(capturedEvent.level, SentryLevel.error);
     });
   });
 }

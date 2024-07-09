@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:meta/meta.dart';
 
 import '../sentry.dart';
+import 'metrics/local_metrics_aggregator.dart';
 import 'profiling.dart';
 import 'sentry_tracer_finish_status.dart';
 import 'utils/sample_rate_format.dart';
@@ -49,9 +50,9 @@ class SentryTracer extends ISentrySpan {
   /// highest timestamp of child spans, trimming the duration of the
   /// transaction. This is useful to discard extra time in the transaction that
   /// is not accounted for in child spans, like what happens in the
-  /// [SentryNavigatorObserver] idle transactions, where we finish the
-  /// transaction after a given "idle time" and we don't want this "idle time"
-  /// to be part of the transaction.
+  /// [SentryNavigatorObserver](https://pub.dev/documentation/sentry_flutter/latest/sentry_flutter/SentryNavigatorObserver-class.html)
+  /// idle transactions, where we finish the transaction after a given
+  /// "idle time" and we don't want this "idle time" to be part of the transaction.
   SentryTracer(
     SentryTransactionContext transactionContext,
     this._hub, {
@@ -68,6 +69,7 @@ class SentryTracer extends ISentrySpan {
       _hub,
       samplingDecision: transactionContext.samplingDecision,
       startTimestamp: startTimestamp,
+      isRootSpan: true,
     );
     _waitForChildren = waitForChildren;
     _autoFinishAfter = autoFinishAfter;
@@ -79,6 +81,12 @@ class SentryTracer extends ISentrySpan {
         SentryTransactionNameSource.custom;
     _trimEnd = trimEnd;
     _onFinish = onFinish;
+
+    for (final collector in _hub.options.performanceCollectors) {
+      if (collector is PerformanceContinuousCollector) {
+        collector.onSpanStarted(_rootSpan);
+      }
+    }
   }
 
   @override
@@ -99,27 +107,24 @@ class SentryTracer extends ISentrySpan {
       _children.removeWhere(
           (span) => !_hasSpanSuitableTimestamps(span, commonEndTimestamp));
 
-      // finish unfinished spans otherwise transaction gets dropped
-      final spansToBeFinished = _children.where((span) => !span.finished);
-      for (final span in spansToBeFinished) {
-        await span.finish(
-          status: SpanStatus.deadlineExceeded(),
-          endTimestamp: commonEndTimestamp,
-        );
-      }
-
       var _rootEndTimestamp = commonEndTimestamp;
-      if (_trimEnd && children.isNotEmpty) {
-        final childEndTimestamps = children
-            .where((child) => child.endTimestamp != null)
-            .map((child) => child.endTimestamp!);
 
-        if (childEndTimestamps.isNotEmpty) {
-          final oldestChildEndTimestamp =
-              childEndTimestamps.reduce((a, b) => a.isAfter(b) ? a : b);
-          if (_rootEndTimestamp.isAfter(oldestChildEndTimestamp)) {
-            _rootEndTimestamp = oldestChildEndTimestamp;
+      // Trim the end timestamp of the transaction to the very last timestamp of child spans
+      if (_trimEnd && children.isNotEmpty) {
+        DateTime? latestEndTime;
+
+        for (final child in children) {
+          final childEndTimestamp = child.endTimestamp;
+          if (childEndTimestamp != null) {
+            if (latestEndTime == null ||
+                childEndTimestamp.isAfter(latestEndTime)) {
+              latestEndTime = child.endTimestamp;
+            }
           }
+        }
+
+        if (latestEndTime != null) {
+          _rootEndTimestamp = latestEndTime;
         }
       }
 
@@ -258,6 +263,12 @@ class SentryTracer extends ISentrySpan {
 
     _children.add(child);
 
+    for (final collector in _hub.options.performanceCollectors) {
+      if (collector is PerformanceContinuousCollector) {
+        collector.onSpanStarted(child);
+      }
+    }
+
     return child;
   }
 
@@ -363,6 +374,7 @@ class SentryTracer extends ISentrySpan {
       release: _hub.options.release,
       environment: _hub.options.environment,
       userId: null, // because of PII not sending it for now
+      // ignore: deprecated_member_use_from_same_package
       userSegment: user?.segment,
       transaction:
           _isHighQualityTransactionName(transactionNameSource) ? name : null,
@@ -407,4 +419,8 @@ class SentryTracer extends ISentrySpan {
       });
     }
   }
+
+  @override
+  LocalMetricsAggregator? get localMetricsAggregator =>
+      _rootSpan.localMetricsAggregator;
 }

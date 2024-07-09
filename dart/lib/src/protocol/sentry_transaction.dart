@@ -13,49 +13,40 @@ class SentryTransaction extends SentryEvent {
   @internal
   final SentryTracer tracer;
   late final Map<String, SentryMeasurement> measurements;
+  late final Map<String, List<MetricSummary>>? metricSummaries;
   late final SentryTransactionInfo? transactionInfo;
 
   SentryTransaction(
     this.tracer, {
-    SentryId? eventId,
+    super.eventId,
     DateTime? timestamp,
-    String? platform,
-    String? serverName,
-    String? release,
-    String? dist,
-    String? environment,
+    super.platform,
+    super.serverName,
+    super.release,
+    super.dist,
+    super.environment,
     String? transaction,
     dynamic throwable,
     Map<String, String>? tags,
     @Deprecated(
         'Additional Data is deprecated in favor of structured [Contexts] and should be avoided when possible')
     Map<String, dynamic>? extra,
-    SentryUser? user,
-    Contexts? contexts,
-    List<Breadcrumb>? breadcrumbs,
-    SdkVersion? sdk,
-    SentryRequest? request,
+    super.user,
+    super.contexts,
+    super.breadcrumbs,
+    super.sdk,
+    super.request,
     String? type,
     Map<String, SentryMeasurement>? measurements,
+    Map<String, List<MetricSummary>>? metricSummaries,
     SentryTransactionInfo? transactionInfo,
   }) : super(
-          eventId: eventId,
           timestamp: timestamp ?? tracer.endTimestamp,
-          platform: platform,
-          serverName: serverName,
-          release: release,
-          dist: dist,
-          environment: environment,
           transaction: transaction ?? tracer.name,
           throwable: throwable ?? tracer.throwable,
           tags: tags ?? tracer.tags,
           // ignore: deprecated_member_use_from_same_package
           extra: extra ?? tracer.data,
-          user: user,
-          contexts: contexts,
-          breadcrumbs: breadcrumbs,
-          sdk: sdk,
-          request: request,
           type: _type,
         ) {
     startTimestamp = tracer.startTimestamp;
@@ -63,8 +54,10 @@ class SentryTransaction extends SentryEvent {
     final spanContext = tracer.context;
     spans = tracer.children;
     this.measurements = measurements ?? {};
+    this.metricSummaries =
+        metricSummaries ?? tracer.localMetricsAggregator?.getSummaries();
 
-    this.contexts.trace = spanContext.toTraceContext(
+    contexts.trace = spanContext.toTraceContext(
       sampled: tracer.samplingDecision?.sampled,
       status: tracer.status,
     );
@@ -94,6 +87,16 @@ class SentryTransaction extends SentryEvent {
     final transactionInfo = this.transactionInfo;
     if (transactionInfo != null) {
       json['transaction_info'] = transactionInfo.toJson();
+    }
+
+    final metricSummariesMap = metricSummaries?.entries ?? Iterable.empty();
+    if (metricSummariesMap.isNotEmpty) {
+      final map = <String, dynamic>{};
+      for (final entry in metricSummariesMap) {
+        final summary = entry.value.map((e) => e.toJson());
+        map[entry.key] = summary.toList(growable: false);
+      }
+      json['_metrics_summary'] = map;
     }
 
     return json;
@@ -134,6 +137,7 @@ class SentryTransaction extends SentryEvent {
     List<SentryThread>? threads,
     String? type,
     Map<String, SentryMeasurement>? measurements,
+    Map<String, List<MetricSummary>>? metricSummaries,
     SentryTransactionInfo? transactionInfo,
   }) =>
       SentryTransaction(
@@ -159,6 +163,9 @@ class SentryTransaction extends SentryEvent {
         type: type ?? this.type,
         measurements: (measurements != null ? Map.from(measurements) : null) ??
             this.measurements,
+        metricSummaries:
+            (metricSummaries != null ? Map.from(metricSummaries) : null) ??
+                this.metricSummaries,
         transactionInfo: transactionInfo ?? this.transactionInfo,
       );
 }

@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 import 'package:sentry/sentry.dart';
-import 'package:sentry/src/noop_origin.dart'
-    if (dart.library.html) 'package:sentry/src/origin.dart';
+import 'package:sentry/src/origin.dart';
 import 'package:sentry/src/sentry_stack_trace_factory.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'package:test/test.dart';
@@ -254,11 +253,6 @@ isolate_instructions: 10fa27070, vm_instructions: 10fa21e20
       final frames = Fixture()
           .getSut(considerInAppFramesByDefault: true)
           .getStackFrames(StackTrace.fromString('''
-#0      SentryClient._prepareEvent (package:sentry/src/sentry_client.dart:206:33)
-#1      SentryClient.captureEvent (package:sentry/src/sentry_client.dart:74:34)
-#2      Hub.captureEvent (package:sentry/src/hub.dart:97:38)
-<asynchronous suspension>
-#3      LoggingIntegration._onLog (package:sentry_logging/src/logging_integration.dart:58:7)
 <asynchronous suspension>
             '''))
           .map((frame) => frame.toJson());

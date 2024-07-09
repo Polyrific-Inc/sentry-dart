@@ -1,8 +1,11 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:sentry/src/platform/platform.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:sentry_flutter/src/integrations/connectivity/connectivity_integration.dart';
 import 'package:sentry_flutter/src/integrations/integrations.dart';
 import 'package:sentry_flutter/src/integrations/screenshot_integration.dart';
 import 'package:sentry_flutter/src/profiling.dart';
@@ -23,13 +26,18 @@ final platformAgnosticIntegrations = [
   SentryViewHierarchyIntegration,
 ];
 
+final webIntegrations = [
+  ConnectivityIntegration,
+];
+
 final nonWebIntegrations = [
   OnErrorIntegration,
 ];
 
-// These should only be added to Android
+// These should be added to Android
 final androidIntegrations = [
   LoadImageListIntegration,
+  LoadContextsIntegration,
 ];
 
 // These should be added to iOS and macOS
@@ -81,14 +89,18 @@ void main() {
           options: sentryFlutterOptions!, expectedHasNativeScopeObserver: true);
 
       testConfiguration(
-          integrations: integrations,
-          shouldHaveIntegrations: [
-            ...androidIntegrations,
-            ...nativeIntegrations,
-            ...platformAgnosticIntegrations,
-            ...nonWebIntegrations,
-          ],
-          shouldNotHaveIntegrations: iOsAndMacOsIntegrations);
+        integrations: integrations,
+        shouldHaveIntegrations: [
+          ...androidIntegrations,
+          ...nativeIntegrations,
+          ...platformAgnosticIntegrations,
+          ...nonWebIntegrations,
+        ],
+        shouldNotHaveIntegrations: [
+          ...iOsAndMacOsIntegrations,
+          ...nonWebIntegrations,
+        ],
+      );
 
       integrations
           .indexWhere((element) => element is WidgetsFlutterBindingIntegration);
@@ -138,7 +150,10 @@ void main() {
           ...platformAgnosticIntegrations,
           ...nonWebIntegrations,
         ],
-        shouldNotHaveIntegrations: androidIntegrations,
+        shouldNotHaveIntegrations: [
+          ...androidIntegrations,
+          ...nonWebIntegrations,
+        ],
       );
 
       testBefore(
@@ -179,16 +194,15 @@ void main() {
       testScopeObserver(
           options: sentryFlutterOptions!, expectedHasNativeScopeObserver: true);
 
-      testConfiguration(
-        integrations: integrations,
-        shouldHaveIntegrations: [
-          ...iOsAndMacOsIntegrations,
-          ...nativeIntegrations,
-          ...platformAgnosticIntegrations,
-          ...nonWebIntegrations,
-        ],
-        shouldNotHaveIntegrations: androidIntegrations,
-      );
+      testConfiguration(integrations: integrations, shouldHaveIntegrations: [
+        ...iOsAndMacOsIntegrations,
+        ...nativeIntegrations,
+        ...platformAgnosticIntegrations,
+        ...nonWebIntegrations,
+      ], shouldNotHaveIntegrations: [
+        ...androidIntegrations,
+        ...nonWebIntegrations,
+      ]);
 
       testBefore(
           integrations: integrations,
@@ -239,6 +253,7 @@ void main() {
           ...androidIntegrations,
           ...iOsAndMacOsIntegrations,
           ...nativeIntegrations,
+          ...webIntegrations,
         ],
       );
 
@@ -290,6 +305,7 @@ void main() {
           ...androidIntegrations,
           ...iOsAndMacOsIntegrations,
           ...nativeIntegrations,
+          ...webIntegrations,
         ],
       );
 
@@ -336,7 +352,10 @@ void main() {
 
       testConfiguration(
         integrations: integrations,
-        shouldHaveIntegrations: platformAgnosticIntegrations,
+        shouldHaveIntegrations: [
+          ...platformAgnosticIntegrations,
+          ...webIntegrations,
+        ],
         shouldNotHaveIntegrations: [
           ...androidIntegrations,
           ...iOsAndMacOsIntegrations,
@@ -383,7 +402,10 @@ void main() {
 
       testConfiguration(
         integrations: integrations,
-        shouldHaveIntegrations: platformAgnosticIntegrations,
+        shouldHaveIntegrations: [
+          ...platformAgnosticIntegrations,
+          ...webIntegrations,
+        ],
         shouldNotHaveIntegrations: [
           ...androidIntegrations,
           ...iOsAndMacOsIntegrations,
@@ -427,7 +449,10 @@ void main() {
 
       testConfiguration(
         integrations: integrations,
-        shouldHaveIntegrations: platformAgnosticIntegrations,
+        shouldHaveIntegrations: [
+          ...platformAgnosticIntegrations,
+          ...webIntegrations,
+        ],
         shouldNotHaveIntegrations: [
           ...androidIntegrations,
           ...iOsAndMacOsIntegrations,
@@ -472,7 +497,10 @@ void main() {
 
       testConfiguration(
         integrations: integrations,
-        shouldHaveIntegrations: platformAgnosticIntegrations,
+        shouldHaveIntegrations: [
+          ...platformAgnosticIntegrations,
+          ...webIntegrations,
+        ],
         shouldNotHaveIntegrations: [
           ...androidIntegrations,
           ...iOsAndMacOsIntegrations,
@@ -597,6 +625,40 @@ void main() {
       await Sentry.close();
     });
   });
+
+  test('resumeAppHangTracking calls native method when available', () async {
+    SentryFlutter.native = MockSentryNativeBinding();
+    when(SentryFlutter.native?.resumeAppHangTracking())
+        .thenAnswer((_) => Future.value());
+
+    await SentryFlutter.resumeAppHangTracking();
+
+    verify(SentryFlutter.native?.resumeAppHangTracking()).called(1);
+  });
+
+  test('resumeAppHangTracking does nothing when native is null', () async {
+    SentryFlutter.native = null;
+
+    // This should complete without throwing an error
+    await expectLater(SentryFlutter.resumeAppHangTracking(), completes);
+  });
+
+  test('pauseAppHangTracking calls native method when available', () async {
+    SentryFlutter.native = MockSentryNativeBinding();
+    when(SentryFlutter.native?.pauseAppHangTracking())
+        .thenAnswer((_) => Future.value());
+
+    await SentryFlutter.pauseAppHangTracking();
+
+    verify(SentryFlutter.native?.pauseAppHangTracking()).called(1);
+  });
+
+  test('pauseAppHangTracking does nothing when native is null', () async {
+    SentryFlutter.native = null;
+
+    // This should complete without throwing an error
+    await expectLater(SentryFlutter.pauseAppHangTracking(), completes);
+  });
 }
 
 void appRunner() {}
@@ -613,7 +675,7 @@ void loadTestPackage() {
 }
 
 PlatformChecker getPlatformChecker({
-  required MockPlatform platform,
+  required Platform platform,
   bool isWeb = false,
 }) {
   final platformChecker = PlatformChecker(

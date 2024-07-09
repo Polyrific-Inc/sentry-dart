@@ -2,42 +2,45 @@ import 'dart:io';
 
 import '../../../sentry.dart';
 import 'enricher_event_processor.dart';
+import 'io_platform_memory.dart';
 
 EnricherEventProcessor enricherEventProcessor(SentryOptions options) {
   return IoEnricherEventProcessor(options);
 }
 
-/// Enriches [SentryEvents] with various kinds of information.
+/// Enriches [SentryEvent]s with various kinds of information.
 /// Uses Darts [Platform](https://api.dart.dev/stable/dart-io/Platform-class.html)
 /// class to read information.
 class IoEnricherEventProcessor implements EnricherEventProcessor {
-  IoEnricherEventProcessor(
-    this._options,
-  );
+  IoEnricherEventProcessor(this._options);
 
   final SentryOptions _options;
 
   @override
-  SentryEvent? apply(SentryEvent event, {Hint? hint}) {
+  SentryEvent? apply(SentryEvent event, Hint hint) {
+    // Amend app with current memory usage, as this is not available on native.
+    final app = _getApp(event.contexts.app);
+
     // If there's a native integration available, it probably has better
     // information available than Flutter.
-
-    final os = _options.platformChecker.hasNativeIntegration
-        ? null
-        : _getOperatingSystem(event.contexts.operatingSystem);
 
     final device = _options.platformChecker.hasNativeIntegration
         ? null
         : _getDevice(event.contexts.device);
+
+    final os = _options.platformChecker.hasNativeIntegration
+        ? null
+        : _getOperatingSystem(event.contexts.operatingSystem);
 
     final culture = _options.platformChecker.hasNativeIntegration
         ? null
         : _getSentryCulture(event.contexts.culture);
 
     final contexts = event.contexts.copyWith(
-      operatingSystem: os,
       device: device,
+      operatingSystem: os,
       runtimes: _getRuntimes(event.contexts.runtimes),
+      app: app,
       culture: culture,
     );
 
@@ -99,9 +102,18 @@ class IoEnricherEventProcessor implements EnricherEventProcessor {
   }
 
   SentryDevice _getDevice(SentryDevice? device) {
+    final platformMemory = PlatformMemory(_options);
     return (device ?? SentryDevice()).copyWith(
       name: device?.name ?? Platform.localHostname,
       processorCount: device?.processorCount ?? Platform.numberOfProcessors,
+      memorySize: device?.memorySize ?? platformMemory.getTotalPhysicalMemory(),
+      freeMemory: device?.freeMemory ?? platformMemory.getFreePhysicalMemory(),
+    );
+  }
+
+  SentryApp _getApp(SentryApp? app) {
+    return (app ?? SentryApp()).copyWith(
+      appMemory: app?.appMemory ?? ProcessInfo.currentRss,
     );
   }
 

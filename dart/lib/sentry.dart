@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 /// A pure Dart client for Sentry.io crash reporting.
+library sentry_dart;
+
 export 'src/run_zoned_guarded_integration.dart';
 export 'src/hub.dart';
 // useful for tests
@@ -28,6 +30,7 @@ export 'src/http_client/sentry_http_client_error.dart';
 export 'src/sentry_attachment/sentry_attachment.dart';
 export 'src/sentry_user_feedback.dart';
 export 'src/utils/tracing_utils.dart';
+export 'src/performance_collector.dart';
 // tracing
 export 'src/tracing.dart';
 export 'src/hint.dart';
@@ -47,4 +50,8 @@ export 'src/utils/http_header_utils.dart';
 // ignore: invalid_export_of_internal_element
 export 'src/sentry_trace_origins.dart';
 // ignore: invalid_export_of_internal_element
+export 'src/sentry_span_operations.dart';
+// ignore: invalid_export_of_internal_element
 export 'src/utils.dart';
+// spotlight debugging
+export 'src/spotlight.dart';

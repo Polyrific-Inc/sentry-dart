@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:meta/meta.dart';
 import 'package:sentry/sentry.dart';
 import 'package:flutter/widgets.dart';
@@ -5,13 +7,16 @@ import 'package:flutter/widgets.dart';
 import 'binding_wrapper.dart';
 import 'renderer/renderer.dart';
 import 'screenshot/sentry_screenshot_quality.dart';
+import 'event_processor/screenshot_event_processor.dart';
+import 'screenshot/sentry_screenshot_widget.dart';
+import 'sentry_flutter.dart';
+import 'user_interaction/sentry_user_interaction_widget.dart';
 
-/// This class adds options which are only availble in a Flutter environment.
+/// This class adds options which are only available in a Flutter environment.
 /// Note that some of these options require native Sentry integration, which is
 /// not available on all platforms.
 class SentryFlutterOptions extends SentryOptions {
-  SentryFlutterOptions({String? dsn, PlatformChecker? checker})
-      : super(dsn: dsn, checker: checker) {
+  SentryFlutterOptions({super.dsn, super.checker}) {
     enableBreadcrumbTrackingForCurrentPlatform();
   }
 
@@ -170,6 +175,11 @@ class SentryFlutterOptions extends SentryOptions {
   /// Only attach a screenshot when the app is resumed.
   bool attachScreenshotOnlyWhenResumed = false;
 
+  /// Sets a callback which is executed before capturing screenshots. Only
+  /// relevant if `attachScreenshot` is set to true. When false is returned
+  /// from the function, no screenshot will be attached.
+  BeforeScreenshotCallback? beforeScreenshot;
+
   /// Enable or disable automatic breadcrumbs for User interactions Using [Listener]
   ///
   /// Requires adding the [SentryUserInteractionWidget] to the widget tree.
@@ -183,6 +193,12 @@ class SentryFlutterOptions extends SentryOptions {
   /// Example:
   /// runApp(SentryUserInteractionWidget(child: App()));
   bool enableUserInteractionTracing = true;
+
+  /// Enable or disable the tracing of time to full display (TTFD).
+  /// If `SentryFlutter.reportFullyDisplayed()` is not called within 30 seconds
+  /// after the creation of the TTFD span, it will finish with the status [SpanStatus.deadlineExceeded].
+  /// This feature requires using the [Routing Instrumentation](https://docs.sentry.io/platforms/flutter/integrations/routing-instrumentation/).
+  bool enableTimeToFullDisplayTracing = false;
 
   /// Sets the Proguard uuid for Android platform.
   String? proguardUuid;
@@ -215,6 +231,20 @@ class SentryFlutterOptions extends SentryOptions {
 
   /// Read timeout. This will only be synced to the Android native SDK.
   Duration readTimeout = Duration(seconds: 5);
+
+  /// Enable or disable Frames Tracking, which is used to report frame information
+  /// for every [ISentrySpan].
+  ///
+  /// When enabled, the following metrics are reported for each span:
+  /// - Slow frames: The number of frames that exceeded a specified threshold for frame duration.
+  /// - Frozen frames: The number of frames that took an unusually long time to render, indicating a potential freeze or hang.
+  /// - Total frames count: The total number of frames rendered during the span.
+  /// - Frames delay: The delayed frame render duration of all frames.
+
+  /// Read more about frames tracking here: https://develop.sentry.dev/sdk/performance/frames-delay/
+  ///
+  /// Defaults to `true`
+  bool enableFramesTracking = true;
 
   /// By using this, you are disabling native [Breadcrumb] tracking and instead
   /// you are just tracking [Breadcrumb]s which result from events available
@@ -290,3 +320,10 @@ class SentryFlutterOptions extends SentryOptions {
   /// The [navigatorKey] is used to add information of the currently used locale to the contexts.
   GlobalKey<NavigatorState>? navigatorKey;
 }
+
+/// Callback being executed in [ScreenshotEventProcessor], deciding if a
+/// screenshot should be recorded and attached.
+typedef BeforeScreenshotCallback = FutureOr<bool> Function(
+  SentryEvent event, {
+  Hint? hint,
+});

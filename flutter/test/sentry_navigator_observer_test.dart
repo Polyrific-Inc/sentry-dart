@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_use_of_internal_member
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -5,9 +7,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:sentry_flutter/src/native/sentry_native.dart';
+import 'package:sentry_flutter/src/integrations/integrations.dart';
 import 'package:sentry/src/sentry_tracer.dart';
+import 'package:sentry_flutter/src/native/native_frames.dart';
+import 'package:sentry_flutter/src/navigation/time_to_display_tracker.dart';
+import 'package:sentry_flutter/src/navigation/time_to_initial_display_tracker.dart';
 
+import 'fake_frame_callback_handler.dart';
 import 'mocks.dart';
 import 'mocks.mocks.dart';
 
@@ -30,6 +36,7 @@ void main() {
       customSamplingContext: anyNamed('customSamplingContext'),
       startTimestamp: anyNamed('startTimestamp'),
     )).thenReturn(thenReturnSpan);
+    when(mockHub.getSpan()).thenReturn(thenReturnSpan);
   }
 
   setUp(() {
@@ -37,12 +44,11 @@ void main() {
   });
 
   group('NativeFrames', () {
-    late MockNativeChannel mockNativeChannel;
+    late MockSentryNativeBinding mockBinding;
 
     setUp(() {
-      mockNativeChannel = MockNativeChannel();
-      SentryFlutter.native =
-          SentryNative(SentryFlutterOptions(dsn: fakeDsn), mockNativeChannel);
+      mockBinding = MockSentryNativeBinding();
+      SentryFlutter.native = mockBinding;
     });
 
     tearDown(() {
@@ -55,15 +61,21 @@ void main() {
 
       final tracer = getMockSentryTracer();
       _whenAnyStart(mockHub, tracer);
+      when(tracer.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
+      when(tracer.finished).thenReturn(false);
+      when(tracer.status).thenReturn(SpanStatus.ok());
 
       final sut = fixture.getSut(hub: mockHub);
 
       sut.didPush(currentRoute, null);
+      await sut.completedDisplayTracking?.future;
 
       // Handle internal async method calls.
-      await Future.delayed(const Duration(milliseconds: 10), () {
-        expect(mockNativeChannel.numberOfBeginNativeFramesCalls, 1);
-      });
+      await Future.delayed(const Duration(milliseconds: 10), () {});
+      verify(mockBinding.beginNativeFrames()).called(1);
     });
 
     test('transaction finish adds native frames to tracer', () async {
@@ -73,31 +85,28 @@ void main() {
       options.tracesSampleRate = 1;
       final hub = Hub(options);
 
-      final nativeFrames = NativeFrames(3, 2, 1);
-      mockNativeChannel.nativeFrames = nativeFrames;
+      when(mockBinding.endNativeFrames(any))
+          .thenAnswer((_) async => NativeFrames(3, 2, 1));
 
-      final sut = fixture.getSut(
-        hub: hub,
-        autoFinishAfter: Duration(milliseconds: 50),
-      );
+      final sut = fixture.getSut(hub: hub);
 
       sut.didPush(currentRoute, null);
+      await sut.completedDisplayTracking?.future;
 
       // Get ref to created transaction
-      // ignore: invalid_use_of_internal_member
       SentryTracer? actualTransaction;
       hub.configureScope((scope) {
-        // ignore: invalid_use_of_internal_member
         actualTransaction = scope.span as SentryTracer;
       });
 
-      await Future<void>.delayed(Duration(milliseconds: 500));
+      // Wait for the transaction to finish the async native frame fetching
+      await Future<void>.delayed(Duration(milliseconds: 1500));
 
-      expect(mockNativeChannel.numberOfEndNativeFramesCalls, 1);
+      verify(mockBinding.beginNativeFrames()).called(1);
 
       final measurements = actualTransaction?.measurements ?? {};
 
-      expect(measurements.length, 3);
+      expect(measurements.length, 4);
 
       final expectedTotal = SentryMeasurement.totalFrames(3);
       final expectedSlow = SentryMeasurement.slowFrames(2);
@@ -117,15 +126,21 @@ void main() {
   });
 
   group('$SentryNavigatorObserver', () {
-    test('didPush starts transaction', () {
+    test('didPush starts transaction', () async {
       const name = 'Current Route';
       final currentRoute = route(RouteSettings(name: name));
 
-      const op = 'navigation';
+      const op = 'ui.load';
       final hub = _MockHub();
       final span = getMockSentryTracer(name: name);
       when(span.context).thenReturn(SentrySpanContext(operation: op));
       _whenAnyStart(hub, span);
+      when(span.finished).thenReturn(false);
+      when(span.status).thenReturn(SpanStatus.ok());
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
 
       final sut = fixture.getSut(
         hub: hub,
@@ -133,9 +148,11 @@ void main() {
       );
 
       sut.didPush(currentRoute, null);
+      await sut.completedDisplayTracking?.future;
 
       final context = verify(hub.startTransactionWithContext(
         captureAny,
+        startTimestamp: anyNamed('startTimestamp'),
         waitForChildren: true,
         autoFinishAfter: anyNamed('autoFinishAfter'),
         trimEnd: true,
@@ -150,13 +167,14 @@ void main() {
       });
     });
 
-    test('do not bind transaction to scope if no op', () {
+    test('do not bind transaction to scope if no op', () async {
       final currentRoute = route(RouteSettings(name: 'Current Route'));
 
       final hub = _MockHub();
 
       final span = NoOpSentrySpan();
       _whenAnyStart(hub, span);
+      when(hub.getSpan()).thenReturn(null);
 
       final sut = fixture.getSut(
         hub: hub,
@@ -164,9 +182,11 @@ void main() {
       );
 
       sut.didPush(currentRoute, null);
+      await sut.completedDisplayTracking?.future;
 
       verify(hub.startTransactionWithContext(
         any,
+        startTimestamp: anyNamed('startTimestamp'),
         waitForChildren: true,
         autoFinishAfter: Duration(seconds: 5),
         trimEnd: true,
@@ -179,20 +199,24 @@ void main() {
       });
     });
 
-    test('route with empty name does not start transaction', () {
+    test('route with empty name does not start transaction', () async {
       final currentRoute = route(null);
 
       final hub = _MockHub();
       final span = getMockSentryTracer();
       when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
+      when(span.finished).thenReturn(false);
+      when(span.status).thenReturn(SpanStatus.ok());
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(hub: hub);
 
       sut.didPush(currentRoute, null);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
       verifyNever(hub.startTransactionWithContext(
         any,
+        startTimestamp: anyNamed('startTimestamp'),
         waitForChildren: true,
         autoFinishAfter: anyNamed('autoFinishAfter'),
         trimEnd: true,
@@ -204,13 +228,15 @@ void main() {
       });
     });
 
-    test('no transaction on opt-out', () {
+    test('no transaction on opt-out', () async {
       final currentRoute = route(RouteSettings(name: 'Current Route'));
 
       final hub = _MockHub();
       final span = getMockSentryTracer();
       when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
       _whenAnyStart(hub, span);
+      when(span.finished).thenReturn(false);
+      when(span.status).thenReturn(SpanStatus.ok());
 
       final sut = fixture.getSut(hub: hub, enableAutoTransactions: false);
 
@@ -218,6 +244,7 @@ void main() {
 
       verifyNever(hub.startTransactionWithContext(
         any,
+        startTimestamp: anyNamed('startTimestamp'),
         waitForChildren: true,
         autoFinishAfter: anyNamed('autoFinishAfter'),
         trimEnd: true,
@@ -237,6 +264,12 @@ void main() {
 
       final span = getMockSentryTracer();
       when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
+      when(span.finished).thenReturn(false);
+      when(span.status).thenReturn(SpanStatus.ok());
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(hub: hub);
@@ -245,6 +278,7 @@ void main() {
 
       verify(hub.startTransactionWithContext(
         any,
+        startTimestamp: anyNamed('startTimestamp'),
         waitForChildren: true,
         autoFinishAfter: anyNamed('autoFinishAfter'),
         trimEnd: true,
@@ -256,72 +290,178 @@ void main() {
       });
     });
 
-    test('didPush finishes previous transaction', () {
+    test('didPush finishes previous transaction', () async {
       final firstRoute = route(RouteSettings(name: 'First Route'));
       final secondRoute = route(RouteSettings(name: 'Second Route'));
 
       final hub = _MockHub();
-      final span = getMockSentryTracer();
+      final span = getMockSentryTracer(finished: false) as SentryTracer;
       when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
       when(span.status).thenReturn(null);
+      when(span.finished).thenReturn(false);
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
+      when(span.children).thenReturn([]);
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(hub: hub);
 
       sut.didPush(firstRoute, null);
       sut.didPush(secondRoute, firstRoute);
+      sut.didPop(secondRoute, null);
 
-      verify(span.status = SpanStatus.ok());
-      verify(span.finish());
+      hub.configureScope((scope) {
+        expect(scope.span, null);
+      });
+
+      verify(span.finish()).called(2);
     });
 
     test('didPop finishes transaction', () async {
       final currentRoute = route(RouteSettings(name: 'Current Route'));
 
       final hub = _MockHub();
-      final span = getMockSentryTracer();
+      final span = getMockSentryTracer(finished: false) as SentryTracer;
       when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
       when(span.status).thenReturn(null);
+      when(span.finished).thenReturn(false);
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
       _whenAnyStart(hub, span);
+      when(span.children).thenReturn([]);
 
       final sut = fixture.getSut(hub: hub);
 
       sut.didPush(currentRoute, null);
       sut.didPop(currentRoute, null);
 
-      verify(span.status = SpanStatus.ok());
-      verify(span.finish());
+      hub.configureScope((scope) {
+        expect(scope.span, null);
+      });
+
+      verify(span.finish()).called(1);
     });
 
-    test('didPop re-starts previous', () {
-      final previousRoute = route(RouteSettings(name: 'Previous Route'));
+    test('multiple didPop only finish transaction once', () async {
       final currentRoute = route(RouteSettings(name: 'Current Route'));
 
       final hub = _MockHub();
-      final previousSpan = getMockSentryTracer();
-      when(previousSpan.context).thenReturn(SentrySpanContext(operation: 'op'));
-      when(previousSpan.status).thenReturn(null);
-
-      _whenAnyStart(hub, previousSpan);
+      final span = getMockSentryTracer(finished: false) as SentryTracer;
+      when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
+      when(span.status).thenReturn(null);
+      when(span.children).thenReturn([]);
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
+      _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(hub: hub);
 
-      sut.didPop(currentRoute, previousRoute);
+      sut.didPush(currentRoute, null);
+      await sut.completedDisplayTracking?.future;
 
-      verify(hub.startTransactionWithContext(
-        any,
-        waitForChildren: true,
-        autoFinishAfter: anyNamed('autoFinishAfter'),
-        trimEnd: true,
-        onFinish: anyNamed('onFinish'),
-      ));
+      sut.didPop(currentRoute, null);
+      sut.didPop(currentRoute, null);
 
       hub.configureScope((scope) {
-        expect(scope.span, previousSpan);
+        expect(scope.span, null);
       });
+
+      verify(span.finish()).called(1);
     });
 
-    test('route arguments are set on transaction', () {
+    test(
+        'unfinished children will be finished with deadline_exceeded on didPush',
+        () async {
+      final currentRoute = route(RouteSettings(name: 'Current Route'));
+
+      final hub = _MockHub();
+      final span = getMockSentryTracer(finished: false) as SentryTracer;
+      final mockChildA = MockSentrySpan();
+      final mockChildB = MockSentrySpan();
+      when(span.children).thenReturn([
+        mockChildB,
+        mockChildA,
+      ]);
+      when(mockChildA.finished).thenReturn(false);
+      when(mockChildB.finished).thenReturn(false);
+      when(mockChildA.context).thenReturn(SentrySpanContext(
+          operation: SentrySpanOperations.uiTimeToInitialDisplay));
+      when(mockChildB.context).thenReturn(SentrySpanContext(
+          operation: SentrySpanOperations.uiTimeToFullDisplay));
+      when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
+      when(span.status).thenReturn(null);
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
+      _whenAnyStart(hub, span);
+
+      final sut = fixture.getSut(hub: hub);
+
+      // Push to new screen, e.g app start / root screen
+      sut.didPush(currentRoute, null);
+
+      // Push to screen e.g root to user screen
+      sut.didPush(currentRoute, null);
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      verify(mockChildA.finish(status: SpanStatus.deadlineExceeded()))
+          .called(1);
+      verify(mockChildB.finish(status: SpanStatus.deadlineExceeded()))
+          .called(1);
+    });
+
+    test(
+        'unfinished children will be finished with deadline_exceeded on didPop',
+        () async {
+      final currentRoute = route(RouteSettings(name: 'Current Route'));
+
+      final hub = _MockHub();
+      final span = getMockSentryTracer(finished: false) as SentryTracer;
+      final mockChildA = MockSentrySpan();
+      final mockChildB = MockSentrySpan();
+      when(span.children).thenReturn([
+        mockChildB,
+        mockChildA,
+      ]);
+      when(mockChildA.finished).thenReturn(false);
+      when(mockChildB.finished).thenReturn(false);
+      when(mockChildA.context).thenReturn(SentrySpanContext(
+          operation: SentrySpanOperations.uiTimeToInitialDisplay));
+      when(mockChildB.context).thenReturn(SentrySpanContext(
+          operation: SentrySpanOperations.uiTimeToFullDisplay));
+      when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
+      when(span.status).thenReturn(null);
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
+      _whenAnyStart(hub, span);
+
+      final sut = fixture.getSut(hub: hub);
+
+      // Push to new screen, e.g root to user screen
+      sut.didPush(currentRoute, null);
+
+      // Pop back e.g user to root screen
+      sut.didPop(currentRoute, null);
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      verify(mockChildA.finish(status: SpanStatus.deadlineExceeded()))
+          .called(1);
+      verify(mockChildB.finish(status: SpanStatus.deadlineExceeded()))
+          .called(1);
+    });
+
+    test('route arguments are set on transaction', () async {
       final arguments = {'foo': 'bar'};
       final currentRoute = route(RouteSettings(
         name: 'Current Route',
@@ -332,43 +472,68 @@ void main() {
       final span = getMockSentryTracer();
       when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
       when(span.status).thenReturn(null);
+      when(span.finished).thenReturn(false);
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(hub: hub);
 
       sut.didPush(currentRoute, null);
+      await sut.completedDisplayTracking?.future;
 
       verify(span.setData('route_settings_arguments', arguments));
     });
 
-    test('flutter root name is replaced', () {
+    test('flutter root name is replaced', () async {
       final rootRoute = route(RouteSettings(name: '/'));
+      NativeAppStartIntegration.setAppStartInfo(
+        AppStartInfo(
+          AppStartType.cold,
+          start: DateTime.now().add(const Duration(seconds: 1)),
+          end: DateTime.now().add(const Duration(seconds: 2)),
+          pluginRegistration: DateTime.now().add(const Duration(seconds: 3)),
+          sentrySetupStart: DateTime.now().add(const Duration(seconds: 4)),
+          nativeSpanTimes: [],
+        ),
+      );
 
       final hub = _MockHub();
       final span = getMockSentryTracer(name: '/');
       when(span.context).thenReturn(SentrySpanContext(operation: 'op'));
+      when(span.finished).thenReturn(false);
+      when(span.status).thenReturn(SpanStatus.ok());
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(hub: hub);
 
       sut.didPush(rootRoute, null);
 
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
       final context = verify(hub.startTransactionWithContext(
         captureAny,
         waitForChildren: true,
+        startTimestamp: anyNamed('startTimestamp'),
         autoFinishAfter: anyNamed('autoFinishAfter'),
         trimEnd: true,
         onFinish: anyNamed('onFinish'),
       )).captured.single as SentryTransactionContext;
 
-      expect(context.name, 'root ("/")');
+      expect(context.name, 'root /');
 
       hub.configureScope((scope) {
         expect(scope.span, span);
       });
     });
 
-    test('didPush sets current route name', () {
+    test('didPush sets current route name', () async {
       const name = 'Current Route';
       final currentRoute = route(RouteSettings(name: name));
 
@@ -376,6 +541,12 @@ void main() {
       final hub = _MockHub();
       final span = getMockSentryTracer(name: name);
       when(span.context).thenReturn(SentrySpanContext(operation: op));
+      when(span.finished).thenReturn(false);
+      when(span.status).thenReturn(SpanStatus.ok());
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(
@@ -384,6 +555,7 @@ void main() {
       );
 
       sut.didPush(currentRoute, null);
+      await sut.completedDisplayTracking?.future;
 
       expect(SentryNavigatorObserver.currentRouteName, 'Current Route');
     });
@@ -398,6 +570,12 @@ void main() {
       final hub = _MockHub();
       final span = getMockSentryTracer(name: oldRouteName);
       when(span.context).thenReturn(SentrySpanContext(operation: op));
+      when(span.finished).thenReturn(false);
+      when(span.status).thenReturn(SpanStatus.ok());
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(
@@ -422,6 +600,11 @@ void main() {
       final span = getMockSentryTracer(name: oldRouteName);
       when(span.context).thenReturn(SentrySpanContext(operation: op));
       when(span.status).thenReturn(null);
+      when(span.finished).thenReturn(false);
+      when(span.startChild('ui.load.initial_display',
+              description: anyNamed('description'),
+              startTimestamp: anyNamed('startTimestamp')))
+          .thenReturn(NoOpSentrySpan());
       _whenAnyStart(hub, span);
 
       final sut = fixture.getSut(
@@ -641,6 +824,7 @@ void main() {
 
       final hub = _MockHub();
       final observer = fixture.getSut(hub: hub);
+      when(hub.getSpan()).thenReturn(NoOpSentrySpan());
 
       final to = route();
       final previous = route();
@@ -795,16 +979,22 @@ void main() {
 }
 
 class Fixture {
-  final mockNativeChannel = MockNativeChannel();
-
   SentryNavigatorObserver getSut({
     required Hub hub,
     bool enableAutoTransactions = true,
-    Duration autoFinishAfter = const Duration(seconds: 3),
+    Duration autoFinishAfter = const Duration(seconds: 1),
     bool setRouteNameAsTransaction = false,
     RouteNameExtractor? routeNameExtractor,
     AdditionalInfoExtractor? additionalInfoProvider,
+    bool enableTimeToFullDisplayTracing = false,
   }) {
+    final frameCallbackHandler = FakeFrameCallbackHandler();
+    final timeToInitialDisplayTracker =
+        TimeToInitialDisplayTracker(frameCallbackHandler: frameCallbackHandler);
+    final timeToDisplayTracker = TimeToDisplayTracker(
+      ttidTracker: timeToInitialDisplayTracker,
+      enableTimeToFullDisplayTracing: enableTimeToFullDisplayTracing,
+    );
     return SentryNavigatorObserver(
       hub: hub,
       enableAutoTransactions: enableAutoTransactions,
@@ -812,6 +1002,7 @@ class Fixture {
       setRouteNameAsTransaction: setRouteNameAsTransaction,
       routeNameExtractor: routeNameExtractor,
       additionalInfoProvider: additionalInfoProvider,
+      timeToDisplayTracker: timeToDisplayTracker,
     );
   }
 
@@ -833,9 +1024,10 @@ class _MockHub extends MockHub {
   }
 }
 
-ISentrySpan getMockSentryTracer({String? name}) {
+ISentrySpan getMockSentryTracer({String? name, bool? finished}) {
   final tracer = MockSentryTracer();
   when(tracer.name).thenReturn(name ?? 'name');
+  when(tracer.finished).thenReturn(finished ?? true);
   return tracer;
 }
 

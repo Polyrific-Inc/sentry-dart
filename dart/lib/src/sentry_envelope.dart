@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'client_reports/client_report.dart';
+import 'metrics/metric.dart';
 import 'protocol.dart';
 import 'sentry_item_type.dart';
 import 'sentry_options.dart';
@@ -12,7 +13,8 @@ import 'sentry_user_feedback.dart';
 
 /// Class representation of `Envelope` file.
 class SentryEnvelope {
-  SentryEnvelope(this.header, this.items);
+  SentryEnvelope(this.header, this.items,
+      {this.containsUnhandledException = false});
 
   /// Header describing envelope content.
   final SentryEnvelopeHeader header;
@@ -20,7 +22,11 @@ class SentryEnvelope {
   /// All items contained in the envelope.
   final List<SentryEnvelopeItem> items;
 
-  /// Create an [SentryEnvelope] with containing one [SentryEnvelopeItem] which holds the [SentryEvent] data.
+  /// Whether the envelope contains an unhandled exception.
+  /// This is used to determine if the native SDK should start a new session.
+  final bool containsUnhandledException;
+
+  /// Create a [SentryEnvelope] containing one [SentryEnvelopeItem] which holds the [SentryEvent] data.
   factory SentryEnvelope.fromEvent(
     SentryEvent event,
     SdkVersion sdkVersion, {
@@ -28,6 +34,15 @@ class SentryEnvelope {
     SentryTraceContextHeader? traceContext,
     List<SentryAttachment>? attachments,
   }) {
+    bool containsUnhandledException = false;
+
+    if (event.exceptions != null && event.exceptions!.isNotEmpty) {
+      // Check all exceptions for any unhandled ones
+      containsUnhandledException = event.exceptions!.any((exception) {
+        return exception.mechanism?.handled == false;
+      });
+    }
+
     return SentryEnvelope(
       SentryEnvelopeHeader(
         event.eventId,
@@ -40,6 +55,7 @@ class SentryEnvelope {
         if (attachments != null)
           ...attachments.map((e) => SentryEnvelopeItem.fromAttachment(e))
       ],
+      containsUnhandledException: containsUnhandledException,
     );
   }
 
@@ -59,7 +75,7 @@ class SentryEnvelope {
     );
   }
 
-  /// Create an [SentryEnvelope] with containing one [SentryEnvelopeItem] which holds the [SentryTransaction] data.
+  /// Create a [SentryEnvelope] containing one [SentryEnvelopeItem] which holds the [SentryTransaction] data.
   factory SentryEnvelope.fromTransaction(
     SentryTransaction transaction,
     SdkVersion sdkVersion, {
@@ -79,6 +95,22 @@ class SentryEnvelope {
         if (attachments != null)
           ...attachments.map((e) => SentryEnvelopeItem.fromAttachment(e))
       ],
+    );
+  }
+
+  /// Create a [SentryEnvelope] containing one [SentryEnvelopeItem] which holds the [Metric] data.
+  factory SentryEnvelope.fromMetrics(
+    Map<int, Iterable<Metric>> metricsBuckets,
+    SdkVersion sdkVersion, {
+    String? dsn,
+  }) {
+    return SentryEnvelope(
+      SentryEnvelopeHeader(
+        SentryId.newId(),
+        sdkVersion,
+        dsn: dsn,
+      ),
+      [SentryEnvelopeItem.fromMetrics(metricsBuckets)],
     );
   }
 

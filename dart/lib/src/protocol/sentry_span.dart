@@ -1,27 +1,37 @@
 import 'dart:async';
 
-import '../hub.dart';
-import '../protocol.dart';
+import 'package:meta/meta.dart';
+
+import '../../sentry.dart';
+import '../metrics/local_metrics_aggregator.dart';
 
 import '../sentry_tracer.dart';
-import '../tracing.dart';
-import '../utils.dart';
 
 typedef OnFinishedCallback = Future<void> Function({DateTime? endTimestamp});
 
 class SentrySpan extends ISentrySpan {
   final SentrySpanContext _context;
   DateTime? _endTimestamp;
+  Map<String, List<MetricSummary>>? _metricSummaries;
   late final DateTime _startTimestamp;
   final Hub _hub;
 
+  bool _isRootSpan = false;
+
+  bool get isRootSpan => _isRootSpan;
+
+  @internal
+  SentryTracer get tracer => _tracer;
+
   final SentryTracer _tracer;
+
   final Map<String, dynamic> _data = {};
   dynamic _throwable;
 
   SpanStatus? _status;
   final Map<String, String> _tags = {};
   OnFinishedCallback? _finishedCallback;
+  late final LocalMetricsAggregator? _localMetricsAggregator;
 
   @override
   final SentryTracesSamplingDecision? samplingDecision;
@@ -33,10 +43,15 @@ class SentrySpan extends ISentrySpan {
     DateTime? startTimestamp,
     this.samplingDecision,
     OnFinishedCallback? finishedCallback,
+    isRootSpan = false,
   }) {
     _startTimestamp = startTimestamp?.toUtc() ?? _hub.options.clock();
     _finishedCallback = finishedCallback;
     _origin = _context.origin;
+    _localMetricsAggregator = _hub.options.enableSpanLocalMetricAggregation
+        ? LocalMetricsAggregator()
+        : null;
+    _isRootSpan = isRootSpan;
   }
 
   @override
@@ -50,21 +65,32 @@ class SentrySpan extends ISentrySpan {
     }
 
     if (endTimestamp == null) {
-      _endTimestamp = _hub.options.clock();
+      endTimestamp = _hub.options.clock();
     } else if (endTimestamp.isBefore(_startTimestamp)) {
       _hub.options.logger(
         SentryLevel.warning,
         'End timestamp ($endTimestamp) cannot be before start timestamp ($_startTimestamp)',
       );
-      _endTimestamp = _hub.options.clock();
+      endTimestamp = _hub.options.clock();
     } else {
-      _endTimestamp = endTimestamp.toUtc();
+      endTimestamp = endTimestamp.toUtc();
     }
+
+    for (final collector in _hub.options.performanceCollectors) {
+      if (collector is PerformanceContinuousCollector) {
+        await collector.onSpanFinished(this, endTimestamp);
+      }
+    }
+
+    // The finished flag depends on the _endTimestamp
+    // If we set this earlier then finished is true and then we cannot use setData etc...
+    _endTimestamp = endTimestamp;
 
     // associate error
     if (_throwable != null) {
       _hub.setSpanContext(_throwable, this, _tracer.name);
     }
+    _metricSummaries = _localMetricsAggregator?.getSummaries();
     await _finishedCallback?.call(endTimestamp: _endTimestamp);
     return super.finish(status: status, endTimestamp: _endTimestamp);
   }
@@ -154,6 +180,9 @@ class SentrySpan extends ISentrySpan {
   @override
   set origin(String? origin) => _origin = origin;
 
+  @override
+  LocalMetricsAggregator? get localMetricsAggregator => _localMetricsAggregator;
+
   Map<String, dynamic> toJson() {
     final json = _context.toJson();
     json['start_timestamp'] =
@@ -173,6 +202,16 @@ class SentrySpan extends ISentrySpan {
     }
     if (_origin != null) {
       json['origin'] = _origin;
+    }
+
+    final metricSummariesMap = _metricSummaries?.entries ?? Iterable.empty();
+    if (metricSummariesMap.isNotEmpty) {
+      final map = <String, dynamic>{};
+      for (final entry in metricSummariesMap) {
+        final summary = entry.value.map((e) => e.toJson());
+        map[entry.key] = summary.toList(growable: false);
+      }
+      json['_metrics_summary'] = map;
     }
     return json;
   }

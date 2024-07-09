@@ -5,6 +5,7 @@ import UIKit
 #elseif os(macOS)
 import FlutterMacOS
 import AppKit
+import CoreVideo
 #endif
 
 // swiftlint:disable file_length function_body_length
@@ -26,7 +27,11 @@ public class SentryFlutterPluginApple: NSObject, FlutterPlugin {
 #endif
     }
 
+    private static var pluginRegistrationTime: Int64 = 0
+
     public static func register(with registrar: FlutterPluginRegistrar) {
+        pluginRegistrationTime = Int64(Date().timeIntervalSince1970 * 1000)
+
 #if os(iOS)
         let channel = FlutterMethodChannel(name: "sentry_flutter", binaryMessenger: registrar.messenger())
 #elseif os(macOS)
@@ -159,6 +164,15 @@ public class SentryFlutterPluginApple: NSObject, FlutterPlugin {
         case "collectProfile":
             collectProfile(call, result)
         #endif
+
+        case "displayRefreshRate":
+            displayRefreshRate(result)
+
+        case "pauseAppHangTracking":
+            pauseAppHangTracking(result)
+
+        case "resumeAppHangTracking":
+            resumeAppHangTracking(result)
 
         default:
             result(FlutterMethodNotImplemented)
@@ -375,6 +389,19 @@ public class SentryFlutterPluginApple: NSObject, FlutterPlugin {
         return
     }
 
+    struct TimeSpan {
+        var startTimestampMsSinceEpoch: NSNumber
+        var stopTimestampMsSinceEpoch: NSNumber
+        var description: String
+
+        func addToMap(_ map: inout [String: Any]) {
+            map[description] = [
+                "startTimestampMsSinceEpoch": startTimestampMsSinceEpoch,
+                "stopTimestampMsSinceEpoch": stopTimestampMsSinceEpoch
+            ]
+        }
+    }
+
     private func fetchNativeAppStart(result: @escaping FlutterResult) {
         #if os(iOS) || os(tvOS)
         guard let appStartMeasurement = PrivateSentrySDKOnly.appStartMeasurement else {
@@ -383,12 +410,53 @@ public class SentryFlutterPluginApple: NSObject, FlutterPlugin {
             return
         }
 
+        var nativeSpanTimes: [String: Any] = [:]
+
+        let appStartTimeMs = appStartMeasurement.appStartTimestamp.timeIntervalSince1970.toMilliseconds()
+        let runtimeInitTimeMs = appStartMeasurement.runtimeInitTimestamp.timeIntervalSince1970.toMilliseconds()
+        let moduleInitializationTimeMs =
+            appStartMeasurement.moduleInitializationTimestamp.timeIntervalSince1970.toMilliseconds()
+        let sdkStartTimeMs = appStartMeasurement.sdkStartTimestamp.timeIntervalSince1970.toMilliseconds()
+
+        if !appStartMeasurement.isPreWarmed {
+            let preRuntimeInitDescription = "Pre Runtime Init"
+            let preRuntimeInitSpan = TimeSpan(
+                startTimestampMsSinceEpoch: NSNumber(value: appStartTimeMs),
+                stopTimestampMsSinceEpoch: NSNumber(value: runtimeInitTimeMs),
+                description: preRuntimeInitDescription
+            )
+            preRuntimeInitSpan.addToMap(&nativeSpanTimes)
+
+            let moduleInitializationDescription = "Runtime init to Pre Main initializers"
+            let moduleInitializationSpan = TimeSpan(
+                startTimestampMsSinceEpoch: NSNumber(value: runtimeInitTimeMs),
+                stopTimestampMsSinceEpoch: NSNumber(value: moduleInitializationTimeMs),
+                description: moduleInitializationDescription
+            )
+            moduleInitializationSpan.addToMap(&nativeSpanTimes)
+        }
+
+        let uiKitInitDescription = "UIKit init"
+        let uiKitInitSpan = TimeSpan(
+            startTimestampMsSinceEpoch: NSNumber(value: moduleInitializationTimeMs),
+            stopTimestampMsSinceEpoch: NSNumber(value: sdkStartTimeMs),
+            description: uiKitInitDescription
+        )
+        uiKitInitSpan.addToMap(&nativeSpanTimes)
+
+        // Info: We don't have access to didFinishLaunchingTimestamp,
+        // On HybridSDKs, the Cocoa SDK misses the didFinishLaunchNotification and the
+        // didBecomeVisibleNotification. Therefore, we can't set the
+        // didFinishLaunchingTimestamp
+
         let appStartTime = appStartMeasurement.appStartTimestamp.timeIntervalSince1970 * 1000
         let isColdStart = appStartMeasurement.type == .cold
 
         let item: [String: Any] = [
+            "pluginRegistrationTime": SentryFlutterPluginApple.pluginRegistrationTime,
             "appStartTime": appStartTime,
-            "isColdStart": isColdStart
+            "isColdStart": isColdStart,
+            "nativeSpanTimes": nativeSpanTimes
         ]
 
         result(item)
@@ -430,10 +498,9 @@ public class SentryFlutterPluginApple: NSObject, FlutterPlugin {
       }
 
       let currentFrames = PrivateSentrySDKOnly.currentScreenFrames
-
-      let total = currentFrames.total - totalFrames
-      let frozen = currentFrames.frozen - frozenFrames
-      let slow = currentFrames.slow - slowFrames
+      let total = max(Int(currentFrames.total) - Int(totalFrames), 0)
+      let frozen = max(Int(currentFrames.frozen) - Int(frozenFrames), 0)
+      let slow = max(Int(currentFrames.slow) - Int(slowFrames), 0)
 
       if total <= 0 && frozen <= 0 && slow <= 0 {
         result(nil)
@@ -594,6 +661,80 @@ public class SentryFlutterPluginApple: NSObject, FlutterPlugin {
         PrivateSentrySDKOnly.discardProfiler(forTrace: SentryId(uuidString: traceId))
         result(nil)
     }
+
+    #if os(iOS)
+    // Taken from the Flutter engine:
+    // https://github.com/flutter/engine/blob/main/shell/platform/darwin/ios/framework/Source/vsync_waiter_ios.mm#L150
+    private func displayRefreshRate(_ result: @escaping FlutterResult) {
+        let displayLink = CADisplayLink(target: self, selector: #selector(onDisplayLink(_:)))
+        displayLink.add(to: .main, forMode: .common)
+        displayLink.isPaused = true
+
+        let preferredFPS = displayLink.preferredFramesPerSecond
+        displayLink.invalidate()
+
+        if preferredFPS != 0 {
+            result(preferredFPS)
+            return
+        }
+
+        if #available(iOS 13.0, *) {
+            guard let windowScene = UIApplication.shared.windows.first?.windowScene else {
+                result(nil)
+                return
+            }
+            result(windowScene.screen.maximumFramesPerSecond)
+        } else {
+            result(UIScreen.main.maximumFramesPerSecond)
+        }
+    }
+
+    @objc private func onDisplayLink(_ displayLink: CADisplayLink) {
+        // No-op
+    }
+    #elseif os(macOS)
+    private func displayRefreshRate(_ result: @escaping FlutterResult) {
+        // We don't use CADisplayLink for macOS because it's only available starting with macOS 14
+        guard let window = NSApplication.shared.keyWindow else {
+            result(nil)
+            return
+        }
+
+        guard let screen = window.screen else {
+            result(nil)
+            return
+        }
+
+        guard let displayID =
+                screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+            result(nil)
+            return
+        }
+
+        guard let mode = CGDisplayCopyDisplayMode(displayID) else {
+            result(nil)
+            return
+        }
+
+        result(Int(mode.refreshRate))
+    }
+    #endif
+
+    private func pauseAppHangTracking(_ result: @escaping FlutterResult) {
+        SentrySDK.pauseAppHangTracking()
+        result("")
+    }
+
+    private func resumeAppHangTracking(_ result: @escaping FlutterResult) {
+        SentrySDK.resumeAppHangTracking()
+        result("")
+    }
 }
 
 // swiftlint:enable function_body_length
+
+private extension TimeInterval {
+    func toMilliseconds() -> Int64 {
+        return Int64(self * 1000)
+    }
+}
