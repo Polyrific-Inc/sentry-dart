@@ -9,7 +9,6 @@ environment:
 dependencies:
   sentry:
     path: ../../dart/
-  web: ^0.5.1
 
 dev_dependencies:
   build_runner: ^2.4.2

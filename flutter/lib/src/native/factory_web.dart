@@ -4,7 +4,6 @@ import '../../sentry_flutter.dart';
 import 'sentry_native_binding.dart';
 
 // This isn't actually called, see SentryFlutter.init()
-SentryNativeBinding createBinding(SentryFlutterOptions options,
-    {MethodChannel channel = const MethodChannel('sentry_flutter')}) {
+SentryNativeBinding createBinding(PlatformChecker _, MethodChannel __) {
   throw UnsupportedError("Native binding is not supported on this platform.");
 }

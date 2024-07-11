@@ -10,13 +10,6 @@ import 'mocks.mocks.dart';
 import 'sentry_flutter_test.dart';
 
 void main() {
-  late MockSentryNativeBinding mock;
-
-  setUp(() {
-    mock = MockSentryNativeBinding();
-    when(mock.startProfiler(any)).thenReturn(1);
-  });
-
   group('$SentryNativeProfilerFactory', () {
     Hub hubWithSampleRate(double profilesSampleRate) {
       final o = SentryFlutterOptions(dsn: fakeDsn);
@@ -30,39 +23,42 @@ void main() {
 
     test('attachTo() respects sampling rate', () async {
       var hub = hubWithSampleRate(0.0);
-      SentryNativeProfilerFactory.attachTo(hub, mock);
+      SentryNativeProfilerFactory.attachTo(hub, TestMockSentryNative());
       // ignore: invalid_use_of_internal_member
       verifyNever(hub.profilerFactory = any);
 
       hub = hubWithSampleRate(0.1);
-      SentryNativeProfilerFactory.attachTo(hub, mock);
+      SentryNativeProfilerFactory.attachTo(hub, TestMockSentryNative());
       // ignore: invalid_use_of_internal_member
       verify(hub.profilerFactory = any);
     });
 
     test('creates a profiler', () async {
+      final nativeMock = TestMockSentryNative();
       // ignore: invalid_use_of_internal_member
-      final sut = SentryNativeProfilerFactory(mock, getUtcDateTime);
+      final sut = SentryNativeProfilerFactory(nativeMock, getUtcDateTime);
       final profiler = sut.startProfiler(SentryTransactionContext(
         'name',
         'op',
       ));
-      verify(mock.startProfiler(any)).called(1);
+      expect(nativeMock.numberOfStartProfilerCalls, 1);
       expect(profiler, isNotNull);
     });
   });
 
   group('$SentryNativeProfiler', () {
+    late TestMockSentryNative nativeMock;
     late SentryNativeProfiler sut;
 
     setUp(() {
+      nativeMock = TestMockSentryNative();
       // ignore: invalid_use_of_internal_member
-      final factory = SentryNativeProfilerFactory(mock, getUtcDateTime);
+      final factory = SentryNativeProfilerFactory(nativeMock, getUtcDateTime);
       final profiler = factory.startProfiler(SentryTransactionContext(
         'name',
         'op',
       ));
-      verify(mock.startProfiler(any)).called(1);
+      expect(nativeMock.numberOfStartProfilerCalls, 1);
       expect(profiler, isNotNull);
       sut = profiler!;
     });
@@ -75,15 +71,14 @@ void main() {
       await null;
       await null;
 
-      verify(mock.discardProfiler(any)).called(1);
+      expect(nativeMock.numberOfDiscardProfilerCalls, 1);
 
       // finishFor() mustn't work after disposing
       expect(await sut.finishFor(MockSentryTransaction()), isNull);
-      verifyNever(mock.collectProfile(any, any, any));
+      expect(nativeMock.numberOfCollectProfileCalls, 0);
     });
 
     test('dispose() does not call discard() after finishing', () async {
-      when(mock.collectProfile(any, any, any)).thenAnswer((_) async => null);
       final mockTransaction = MockSentryTransaction();
       when(mockTransaction.startTimestamp).thenReturn(DateTime.now());
       when(mockTransaction.timestamp).thenReturn(DateTime.now());
@@ -94,8 +89,8 @@ void main() {
       // Yield to let the .then() in .dispose() execute.
       await null;
 
-      verifyNever(mock.discardProfiler(any));
-      verify(mock.collectProfile(any, any, any)).called(1);
+      expect(nativeMock.numberOfDiscardProfilerCalls, 0);
+      expect(nativeMock.numberOfCollectProfileCalls, 1);
     });
   });
 }

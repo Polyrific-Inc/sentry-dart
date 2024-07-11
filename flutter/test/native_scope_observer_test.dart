@@ -2,75 +2,98 @@
 library flutter_test;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:sentry/sentry.dart';
 import 'package:sentry_flutter/src/native/native_scope_observer.dart';
 
-import 'mocks.mocks.dart';
+import 'mocks.dart';
 
 void main() {
-  late MockSentryNativeBinding mock;
-  late NativeScopeObserver sut;
+  late Fixture fixture;
 
   setUp(() {
-    mock = MockSentryNativeBinding();
-    sut = NativeScopeObserver(mock);
+    fixture = Fixture();
   });
 
   test('addBreadcrumbCalls', () async {
+    final sut = fixture.getSut();
     final breadcrumb = Breadcrumb();
     await sut.addBreadcrumb(breadcrumb);
 
-    expect(verify(mock.addBreadcrumb(captureAny)).captured.single, breadcrumb);
+    expect(fixture.mock.breadcrumb, breadcrumb);
+    expect(fixture.mock.numberOfAddBreadcrumbCalls, 1);
   });
 
   test('clearBreadcrumbsCalls', () async {
+    final sut = fixture.getSut();
     await sut.clearBreadcrumbs();
 
-    verify(mock.clearBreadcrumbs()).called(1);
+    expect(fixture.mock.numberOfClearBreadcrumbsCalls, 1);
   });
 
   test('removeContextsCalls', () async {
+    final sut = fixture.getSut();
     await sut.removeContexts('fixture-key');
 
-    expect(
-        verify(mock.removeContexts(captureAny)).captured.single, 'fixture-key');
+    expect(fixture.mock.removeContextsKey, 'fixture-key');
+    expect(fixture.mock.numberOfRemoveContextsCalls, 1);
   });
 
   test('removeExtraCalls', () async {
+    final sut = fixture.getSut();
     await sut.removeExtra('fixture-key');
 
-    expect(verify(mock.removeExtra(captureAny)).captured.single, 'fixture-key');
+    expect(fixture.mock.removeExtraKey, 'fixture-key');
+    expect(fixture.mock.numberOfRemoveExtraCalls, 1);
   });
 
   test('removeTagCalls', () async {
+    final sut = fixture.getSut();
     await sut.removeTag('fixture-key');
 
-    expect(verify(mock.removeTag(captureAny)).captured.single, 'fixture-key');
+    expect(fixture.mock.removeTagKey, 'fixture-key');
+    expect(fixture.mock.numberOfRemoveTagCalls, 1);
   });
 
   test('setContextsCalls', () async {
+    final sut = fixture.getSut();
     await sut.setContexts('fixture-key', 'fixture-value');
 
-    verify(mock.setContexts('fixture-key', 'fixture-value')).called(1);
+    expect(fixture.mock.setContextData['fixture-key'], 'fixture-value');
+    expect(fixture.mock.numberOfSetContextsCalls, 1);
   });
 
   test('setExtraCalls', () async {
+    final sut = fixture.getSut();
     await sut.setExtra('fixture-key', 'fixture-value');
 
-    verify(mock.setExtra('fixture-key', 'fixture-value')).called(1);
+    expect(fixture.mock.setExtraData['fixture-key'], 'fixture-value');
+    expect(fixture.mock.numberOfSetExtraCalls, 1);
   });
 
   test('setTagCalls', () async {
+    final sut = fixture.getSut();
     await sut.setTag('fixture-key', 'fixture-value');
 
-    verify(mock.setTag('fixture-key', 'fixture-value')).called(1);
+    expect(fixture.mock.setTagsData['fixture-key'], 'fixture-value');
+    expect(fixture.mock.numberOfSetTagCalls, 1);
   });
 
   test('setUserCalls', () async {
+    final sut = fixture.getSut();
+
     final user = SentryUser(id: 'foo bar');
     await sut.setUser(user);
 
-    expect(verify(mock.setUser(captureAny)).captured.single, user);
+    expect(fixture.mock.sentryUser, user);
+    expect(fixture.mock.numberOfSetUserCalls, 1);
   });
+}
+
+class Fixture {
+  var mock = TestMockSentryNative();
+
+  NativeScopeObserver getSut() {
+    final sut = NativeScopeObserver(mock);
+    return sut;
+  }
 }

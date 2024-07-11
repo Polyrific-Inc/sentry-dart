@@ -6,7 +6,7 @@ import 'package:meta/meta.dart';
 
 import '../../sentry_flutter.dart';
 import '../frame_callback_handler.dart';
-import '../native/sentry_native_binding.dart';
+import '../native/sentry_native.dart';
 import '../event_processor/native_app_start_event_processor.dart';
 
 /// Integration which handles communication with native frameworks in order to
@@ -16,28 +16,12 @@ class NativeAppStartIntegration extends Integration<SentryFlutterOptions> {
       {Hub? hub})
       : _hub = hub ?? HubAdapter();
 
-  final SentryNativeBinding _native;
+  final SentryNative _native;
   final FrameCallbackHandler _frameCallbackHandler;
   final Hub _hub;
 
-  /// This timestamp marks the end of app startup. Either set automatically when
-  /// [SentryFlutterOptions.autoAppStart] is true, or by calling
-  /// [SentryFlutter.setAppStartEnd]
-  @internal
-  static DateTime? appStartEnd;
-
-  /// Flag indicating if app start was already fetched.
-  static bool _didFetchAppStart = false;
-
-  /// Flag indicating if app start measurement was added to the first transaction.
-  @internal
-  static bool didAddAppStartMeasurement = false;
-
   /// Timeout duration to wait for the app start info to be fetched.
-  static const _timeoutDuration = Duration(seconds: 10);
-
-  @visibleForTesting
-  static Duration get timeoutDuration => _timeoutDuration;
+  static const _timeoutDuration = Duration(seconds: 30);
 
   /// We filter out App starts more than 60s
   static const _maxAppStartMillis = 60000;
@@ -71,14 +55,6 @@ class NativeAppStartIntegration extends Integration<SentryFlutterOptions> {
   static void clearAppStartInfo() {
     _appStartInfo = null;
     _appStartCompleter = Completer<AppStartInfo?>();
-    didAddAppStartMeasurement = false;
-  }
-
-  /// Reset state
-  @visibleForTesting
-  static void reset() {
-    appStartEnd = null;
-    _didFetchAppStart = false;
   }
 
   @override
@@ -97,12 +73,11 @@ class NativeAppStartIntegration extends Integration<SentryFlutterOptions> {
       return;
     }
 
-    if (_didFetchAppStart) {
+    if (_native.didFetchAppStart) {
       return;
     }
 
     _frameCallbackHandler.addPostFrameCallback((timeStamp) async {
-      _didFetchAppStart = true;
       final nativeAppStart = await _native.fetchNativeAppStart();
       if (nativeAppStart == null) {
         setAppStartInfo(null);
@@ -119,12 +94,14 @@ class NativeAppStartIntegration extends Integration<SentryFlutterOptions> {
           nativeAppStart.appStartTime.toInt());
       final pluginRegistrationDateTime = DateTime.fromMillisecondsSinceEpoch(
           nativeAppStart.pluginRegistrationTime);
+      DateTime? appStartEndDateTime;
 
       if (options.autoAppStart) {
         // We only assign the current time if it's not already set - this is useful in tests
-        appStartEnd ??= options.clock();
+        _native.appStartEnd ??= options.clock();
+        appStartEndDateTime = _native.appStartEnd;
 
-        final duration = appStartEnd?.difference(appStartDateTime);
+        final duration = appStartEndDateTime?.difference(appStartDateTime);
 
         // We filter out app start more than 60s.
         // This could be due to many different reasons.
@@ -166,7 +143,7 @@ class NativeAppStartIntegration extends Integration<SentryFlutterOptions> {
       final appStartInfo = AppStartInfo(
           nativeAppStart.isColdStart ? AppStartType.cold : AppStartType.warm,
           start: appStartDateTime,
-          end: appStartEnd,
+          end: appStartEndDateTime,
           pluginRegistration: pluginRegistrationDateTime,
           sentrySetupStart: sentrySetupStartDateTime,
           nativeSpanTimes: nativeSpanTimes);
@@ -197,7 +174,7 @@ class NativeAppStartIntegration extends Integration<SentryFlutterOptions> {
       }
     });
 
-    options.addEventProcessor(NativeAppStartEventProcessor(hub: hub));
+    options.addEventProcessor(NativeAppStartEventProcessor(_native, hub: hub));
 
     options.sdk.addIntegration('nativeAppStartIntegration');
   }

@@ -1,73 +1,61 @@
 import 'dart:async';
-// backcompatibility for Flutter < 3.3
-// ignore: unnecessary_import
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 
 import '../../sentry_flutter.dart';
-import 'native_app_start.dart';
-import 'native_frames.dart';
+import 'sentry_native.dart';
 import 'method_channel_helper.dart';
 import 'sentry_native_binding.dart';
-import 'sentry_native_invoker.dart';
-import 'sentry_safe_method_channel.dart';
 
 /// Provide typed methods to access native layer via MethodChannel.
 @internal
-class SentryNativeChannel
-    with SentryNativeSafeInvoker
-    implements SentryNativeBinding {
-  @override
-  final SentryFlutterOptions options;
+class SentryNativeChannel implements SentryNativeBinding {
+  SentryNativeChannel(this._channel);
 
-  final SentrySafeMethodChannel _channel;
+  final MethodChannel _channel;
 
-  SentryNativeChannel(this.options, MethodChannel channel)
-      : _channel = SentrySafeMethodChannel(channel, options);
+  // TODO Move other native calls here.
 
   @override
-  Future<void> init(SentryFlutterOptions options) async {
-    assert(this.options == options);
-    return _channel.invokeMethod('initNativeSdk', <String, dynamic>{
-      'dsn': options.dsn,
-      'debug': options.debug,
-      'environment': options.environment,
-      'release': options.release,
-      'enableAutoSessionTracking': options.enableAutoSessionTracking,
-      'enableNativeCrashHandling': options.enableNativeCrashHandling,
-      'attachStacktrace': options.attachStacktrace,
-      'attachThreads': options.attachThreads,
-      'autoSessionTrackingIntervalMillis':
-          options.autoSessionTrackingInterval.inMilliseconds,
-      'dist': options.dist,
-      'integrations': options.sdk.integrations,
-      'packages':
-          options.sdk.packages.map((e) => e.toJson()).toList(growable: false),
-      'diagnosticLevel': options.diagnosticLevel.name,
-      'maxBreadcrumbs': options.maxBreadcrumbs,
-      'anrEnabled': options.anrEnabled,
-      'anrTimeoutIntervalMillis': options.anrTimeoutInterval.inMilliseconds,
-      'enableAutoNativeBreadcrumbs': options.enableAutoNativeBreadcrumbs,
-      'maxCacheItems': options.maxCacheItems,
-      'sendDefaultPii': options.sendDefaultPii,
-      'enableWatchdogTerminationTracking':
-          options.enableWatchdogTerminationTracking,
-      'enableNdkScopeSync': options.enableNdkScopeSync,
-      'enableAutoPerformanceTracing': options.enableAutoPerformanceTracing,
-      'sendClientReports': options.sendClientReports,
-      'proguardUuid': options.proguardUuid,
-      'maxAttachmentSize': options.maxAttachmentSize,
-      'recordHttpBreadcrumbs': options.recordHttpBreadcrumbs,
-      'captureFailedRequests': options.captureFailedRequests,
-      'enableAppHangTracking': options.enableAppHangTracking,
-      'connectionTimeoutMillis': options.connectionTimeout.inMilliseconds,
-      'readTimeoutMillis': options.readTimeout.inMilliseconds,
-      'appHangTimeoutIntervalMillis':
-          options.appHangTimeoutInterval.inMilliseconds,
-    });
-  }
+  Future<void> init(SentryFlutterOptions options) async =>
+      _channel.invokeMethod('initNativeSdk', <String, dynamic>{
+        'dsn': options.dsn,
+        'debug': options.debug,
+        'environment': options.environment,
+        'release': options.release,
+        'enableAutoSessionTracking': options.enableAutoSessionTracking,
+        'enableNativeCrashHandling': options.enableNativeCrashHandling,
+        'attachStacktrace': options.attachStacktrace,
+        'attachThreads': options.attachThreads,
+        'autoSessionTrackingIntervalMillis':
+            options.autoSessionTrackingInterval.inMilliseconds,
+        'dist': options.dist,
+        'integrations': options.sdk.integrations,
+        'packages':
+            options.sdk.packages.map((e) => e.toJson()).toList(growable: false),
+        'diagnosticLevel': options.diagnosticLevel.name,
+        'maxBreadcrumbs': options.maxBreadcrumbs,
+        'anrEnabled': options.anrEnabled,
+        'anrTimeoutIntervalMillis': options.anrTimeoutInterval.inMilliseconds,
+        'enableAutoNativeBreadcrumbs': options.enableAutoNativeBreadcrumbs,
+        'maxCacheItems': options.maxCacheItems,
+        'sendDefaultPii': options.sendDefaultPii,
+        'enableWatchdogTerminationTracking':
+            options.enableWatchdogTerminationTracking,
+        'enableNdkScopeSync': options.enableNdkScopeSync,
+        'enableAutoPerformanceTracing': options.enableAutoPerformanceTracing,
+        'sendClientReports': options.sendClientReports,
+        'proguardUuid': options.proguardUuid,
+        'maxAttachmentSize': options.maxAttachmentSize,
+        'recordHttpBreadcrumbs': options.recordHttpBreadcrumbs,
+        'captureFailedRequests': options.captureFailedRequests,
+        'enableAppHangTracking': options.enableAppHangTracking,
+        'connectionTimeoutMillis': options.connectionTimeout.inMilliseconds,
+        'readTimeoutMillis': options.readTimeout.inMilliseconds,
+        'appHangTimeoutIntervalMillis':
+            options.appHangTimeoutInterval.inMilliseconds,
+      });
 
   @override
   Future<void> close() async => _channel.invokeMethod('closeNativeSdk');
@@ -78,17 +66,6 @@ class SentryNativeChannel
         await _channel.invokeMapMethod<String, dynamic>('fetchNativeAppStart');
     return (json != null) ? NativeAppStart.fromJson(json) : null;
   }
-
-  @override
-  Future<void> captureEnvelope(
-      Uint8List envelopeData, bool containsUnhandledException) {
-    return _channel.invokeMethod(
-        'captureEnvelope', [envelopeData, containsUnhandledException]);
-  }
-
-  @override
-  Future<Map<String, dynamic>?> loadContexts() =>
-      _channel.invokeMapMethod<String, dynamic>('loadContexts');
 
   @override
   Future<void> beginNativeFrames() =>
@@ -170,27 +147,4 @@ class SentryNativeChannel
         'startTime': startTimeNs,
         'endTime': endTimeNs,
       });
-
-  @override
-  Future<List<DebugImage>?> loadDebugImages() =>
-      tryCatchAsync('loadDebugImages', () async {
-        final images = await _channel
-            .invokeListMethod<Map<dynamic, dynamic>>('loadImageList');
-        return images
-            ?.map((e) => e.cast<String, dynamic>())
-            .map(DebugImage.fromJson)
-            .toList();
-      });
-
-  @override
-  Future<int?> displayRefreshRate() =>
-      _channel.invokeMethod('displayRefreshRate');
-
-  @override
-  Future<void> pauseAppHangTracking() =>
-      _channel.invokeMethod('pauseAppHangTracking');
-
-  @override
-  Future<void> resumeAppHangTracking() =>
-      _channel.invokeMethod('resumeAppHangTracking');
 }

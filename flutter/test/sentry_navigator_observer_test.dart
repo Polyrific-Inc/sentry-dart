@@ -8,8 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_flutter/src/integrations/integrations.dart';
+import 'package:sentry_flutter/src/native/sentry_native.dart';
 import 'package:sentry/src/sentry_tracer.dart';
-import 'package:sentry_flutter/src/native/native_frames.dart';
 import 'package:sentry_flutter/src/navigation/time_to_display_tracker.dart';
 import 'package:sentry_flutter/src/navigation/time_to_initial_display_tracker.dart';
 
@@ -41,14 +41,16 @@ void main() {
 
   setUp(() {
     fixture = Fixture();
+    WidgetsFlutterBinding.ensureInitialized();
   });
 
   group('NativeFrames', () {
-    late MockSentryNativeBinding mockBinding;
+    late MockNativeChannel mockNativeChannel;
 
     setUp(() {
-      mockBinding = MockSentryNativeBinding();
-      SentryFlutter.native = mockBinding;
+      mockNativeChannel = MockNativeChannel();
+      SentryFlutter.native =
+          SentryNative(SentryFlutterOptions(dsn: fakeDsn), mockNativeChannel);
     });
 
     tearDown(() {
@@ -74,8 +76,9 @@ void main() {
       await sut.completedDisplayTracking?.future;
 
       // Handle internal async method calls.
-      await Future.delayed(const Duration(milliseconds: 10), () {});
-      verify(mockBinding.beginNativeFrames()).called(1);
+      await Future.delayed(const Duration(milliseconds: 10), () {
+        expect(mockNativeChannel.numberOfBeginNativeFramesCalls, 1);
+      });
     });
 
     test('transaction finish adds native frames to tracer', () async {
@@ -85,8 +88,12 @@ void main() {
       options.tracesSampleRate = 1;
       final hub = Hub(options);
 
-      when(mockBinding.endNativeFrames(any))
-          .thenAnswer((_) async => NativeFrames(3, 2, 1));
+      mockNativeChannel = MockNativeChannel();
+      SentryFlutter.native =
+          SentryNative(SentryFlutterOptions(dsn: fakeDsn), mockNativeChannel);
+
+      final nativeFrames = NativeFrames(3, 2, 1);
+      mockNativeChannel.nativeFrames = nativeFrames;
 
       final sut = fixture.getSut(hub: hub);
 
@@ -102,7 +109,7 @@ void main() {
       // Wait for the transaction to finish the async native frame fetching
       await Future<void>.delayed(Duration(milliseconds: 1500));
 
-      verify(mockBinding.beginNativeFrames()).called(1);
+      expect(mockNativeChannel.numberOfEndNativeFramesCalls, 1);
 
       final measurements = actualTransaction?.measurements ?? {};
 
@@ -979,6 +986,8 @@ void main() {
 }
 
 class Fixture {
+  final mockNativeChannel = MockNativeChannel();
+
   SentryNavigatorObserver getSut({
     required Hub hub,
     bool enableAutoTransactions = true,

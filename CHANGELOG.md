@@ -1,41 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Features
-
-- Add memory usage to contexts ([#2133](https://github.com/getsentry/sentry-dart/pull/2133))
-  - Only for Linux/Windows applications, as iOS/Android/macOS use native SDKs
-
-### Fixes
-
-- App starts hanging for 30s ([#2140](https://github.com/getsentry/sentry-dart/pull/2140))
-  - Time out for app start info retrieval has been reduced to 10s
-  - If `autoAppStarts` is `false` and `setAppStartEnd` has not been called, the app start event processor will now return early instead of waiting for `getAppStartInfo` to finish
-
-## 8.4.0-beta.1
-
-### Features
-
-- Add API for pausing/resuming **iOS** and **macOS** app hang tracking ([#2134](https://github.com/getsentry/sentry-dart/pull/2134))
-  - This is useful to prevent the Cocoa SDK from reporting wrongly detected app hangs when the OS shows a system dialog for asking specific permissions.
-  - Use `SentryFlutter.pauseAppHangTracking()` and `SentryFlutter.resumeAppHangTracking()`
-- Capture total frames, frames delay, slow & frozen frames and attach to spans ([#2106](https://github.com/getsentry/sentry-dart/pull/2106))
-- Support WebAssembly compilation (dart2wasm) ([#2113](https://github.com/getsentry/sentry-dart/pull/2113))
-
-### Deprecated
-
-- User segment is now deprecated and will be removed in version 9.0.0. Use a custom tag or context instead. ([#2119](https://github.com/getsentry/sentry-dart/pull/2119))
-
-### Dependencies
-
-- Bump Cocoa SDK from v8.29.0 to v8.30.0 ([#2132](https://github.com/getsentry/sentry-dart/pull/2132))
-  - [changelog](https://github.com/getsentry/sentry-cocoa/blob/main/CHANGELOG.md#8300)
-  - [diff](https://github.com/getsentry/sentry-cocoa/compare/8.29.0...8.30.0)
-- Bump Android SDK from v7.10.0 to v7.11.0 ([#2144](https://github.com/getsentry/sentry-dart/pull/2144))
-  - [changelog](https://github.com/getsentry/sentry-java/blob/main/CHANGELOG.md#7110)
-  - [diff](https://github.com/getsentry/sentry-java/compare/7.10.0...7.11.0)
-
 ## 8.3.0
 
 ### Fixes
@@ -150,7 +114,7 @@ This release contains breaking changes, please read the changelog carefully.
 
 ### Features
 
-- Experimental: Add support for Sentry Developer Metrics ([#1940](https://github.com/getsentry/sentry-dart/pull/1940), [#1949](https://github.com/getsentry/sentry-dart/pull/1949), [#1954](https://github.com/getsentry/sentry-dart/pull/1954), [#1958](https://github.com/getsentry/sentry-dart/pull/1958))
+- Experimental: Add support for Sentry Developer Metrics ([#1940](https://github.com/getsentry/sentry-dart/pull/1940), [#1949](https://github.com/getsentry/sentry-dart/pull/1949), [#1954](https://github.com/getsentry/sentry-dart/pull/1954), [#1958](https://github.com/getsentry/sentry-dart/pull/1958))  
   Use the Metrics API to track processing time, download sizes, user signups, and conversion rates and correlate them back to tracing data in order to get deeper insights and solve issues faster. Our API supports counters, distributions, sets, gauges and timers, and it's easy to get started:
   ```dart
   Sentry.metrics()
@@ -263,14 +227,14 @@ This release contains breaking changes, please read the changelog carefully.
   - Now the device context from Android is available in `BeforeSendCallback`
 - Set ip_address to {{auto}} by default, even if sendDefaultPII is disabled ([#1665](https://github.com/getsentry/sentry-dart/pull/1665))
   - Instead use the "Prevent Storing of IP Addresses" option in the "Security & Privacy" project settings on sentry.io
-
-### Fixes
+ 
+### Fixes 
 
 - Remove Flutter dependency from Drift integration ([#1867](https://github.com/getsentry/sentry-dart/pull/1867))
 - Remove dead code, cold start bool is now always present ([#1861](https://github.com/getsentry/sentry-dart/pull/1861))
 - Fix iOS "Arithmetic Overflow" ([#1874](https://github.com/getsentry/sentry-dart/pull/1874))
 
-### Dependencies
+### Dependencies 
 
 - Bump Cocoa SDK from v8.19.0 to v8.20.0 ([#1856](https://github.com/getsentry/sentry-dart/pull/1856))
   - [changelog](https://github.com/getsentry/sentry-cocoa/blob/main/CHANGELOG.md#8200)

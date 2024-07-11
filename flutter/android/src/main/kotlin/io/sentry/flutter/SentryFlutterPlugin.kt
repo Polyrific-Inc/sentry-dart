@@ -2,7 +2,6 @@ package io.sentry.flutter
 
 import android.app.Activity
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -73,7 +72,6 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
       "setTag" -> setTag(call.argument("key"), call.argument("value"), result)
       "removeTag" -> removeTag(call.argument("key"), result)
       "loadContexts" -> loadContexts(result)
-      "displayRefreshRate" -> displayRefreshRate(result)
       else -> result.notImplemented()
     }
   }
@@ -179,29 +177,6 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
       result.success(item)
     }
-  }
-
-  private fun displayRefreshRate(result: Result) {
-    var refreshRate: Int? = null
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      val display = activity?.get()?.display
-      if (display != null) {
-        refreshRate = display.refreshRate.toInt()
-      }
-    } else {
-      val display =
-        activity
-          ?.get()
-          ?.window
-          ?.windowManager
-          ?.defaultDisplay
-      if (display != null) {
-        refreshRate = display.refreshRate.toInt()
-      }
-    }
-
-    result.success(refreshRate)
   }
 
   private fun TimeSpan.addToMap(map: MutableMap<String, Any?>) {
@@ -355,9 +330,8 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     val args = call.arguments() as List<Any>? ?: listOf()
     if (args.isNotEmpty()) {
       val event = args.first() as ByteArray?
-      val containsUnhandledException = args[1] as Boolean
-      if (event != null && event.isNotEmpty() && containsUnhandledException != null) {
-        val id = InternalSentrySdk.captureEnvelope(event, containsUnhandledException)
+      if (event != null && event.isNotEmpty()) {
+        val id = InternalSentrySdk.captureEnvelope(event)
         if (id != null) {
           result.success("")
         } else {

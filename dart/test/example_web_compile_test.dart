@@ -5,35 +5,29 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:version/version.dart';
 import 'package:test/test.dart';
 
 // Tests for the following issue
 // https://github.com/getsentry/sentry-dart/issues/1893
 void main() {
-  final dartVersion = Version.parse(Platform.version.split(' ')[0]);
-  final isLegacy = dartVersion < Version.parse('3.3.0');
-  final exampleAppDir = isLegacy ? 'example_web_legacy' : 'example_web';
-  final exampleAppWorkingDir =
-      '${Directory.current.path}${Platform.pathSeparator}$exampleAppDir';
-  group('Compile $exampleAppDir', () {
+  group('Compile example_web', () {
     test(
       'dart pub get and compilation should run successfully',
       () async {
         final result = await _runProcess('dart pub get',
-            workingDirectory: exampleAppWorkingDir);
+            workingDirectory: _exampleWebWorkingDir);
         expect(result.exitCode, 0,
-            reason: 'Could run `dart pub get` for $exampleAppDir. '
+            reason: 'Could run `dart pub get` for example_web. '
                 'Likely caused by outdated dependencies');
         // running this test locally require clean working directory
         final cleanResult = await _runProcess('dart run build_runner clean',
-            workingDirectory: exampleAppWorkingDir);
+            workingDirectory: _exampleWebWorkingDir);
         expect(cleanResult.exitCode, 0);
         final compileResult = await _runProcess(
             'dart run build_runner build -r web -o build --delete-conflicting-outputs',
-            workingDirectory: exampleAppWorkingDir);
+            workingDirectory: _exampleWebWorkingDir);
         expect(compileResult.exitCode, 0,
-            reason: 'Could not compile $exampleAppDir project');
+            reason: 'Could not compile example_web project');
         expect(
             compileResult.stdout,
             isNot(contains(
@@ -42,9 +36,8 @@ void main() {
                 'Could not compile main.dart, likely because of dart:io import.');
         expect(
             compileResult.stdout,
-            contains(isLegacy
-                ? 'Succeeded after '
-                : 'build_web_compilers:entrypoint on web/main.dart:Compiled'));
+            contains(
+                'build_web_compilers:entrypoint on web/main.dart:Compiled'));
       },
       timeout: Timeout(const Duration(minutes: 1)), // double of detault timeout
     );
@@ -81,6 +74,10 @@ Future<_CommandResult> _runProcess(String command,
   final processOut = utf8.decode(buffer);
   int exitCode = await process.exitCode;
   return _CommandResult(exitCode: exitCode, stdout: processOut);
+}
+
+String get _exampleWebWorkingDir {
+  return '${Directory.current.path}${Platform.pathSeparator}example_web';
 }
 
 class _CommandResult {

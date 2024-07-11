@@ -52,6 +52,7 @@ void main() {
       });
 
       test('finishes ttid span', () async {
+        SentryFlutter.native = TestMockSentryNative();
         final sut = fixture.getSut();
         final endTimestamp =
             fixture.startTimestamp.add(const Duration(milliseconds: 10));
@@ -227,6 +228,7 @@ void main() {
     test('does not create ttfd span when not enabled', () async {
       fixture.options.enableTimeToFullDisplayTracing = false;
 
+      SentryFlutter.native = TestMockSentryNative();
       final sut = fixture.getSut();
 
       final transaction = fixture.getTransaction() as SentryTracer;

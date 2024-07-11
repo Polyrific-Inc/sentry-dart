@@ -1,9 +1,7 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:sentry/src/platform/platform.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_flutter/src/integrations/connectivity/connectivity_integration.dart';
 import 'package:sentry_flutter/src/integrations/integrations.dart';
@@ -625,40 +623,6 @@ void main() {
       await Sentry.close();
     });
   });
-
-  test('resumeAppHangTracking calls native method when available', () async {
-    SentryFlutter.native = MockSentryNativeBinding();
-    when(SentryFlutter.native?.resumeAppHangTracking())
-        .thenAnswer((_) => Future.value());
-
-    await SentryFlutter.resumeAppHangTracking();
-
-    verify(SentryFlutter.native?.resumeAppHangTracking()).called(1);
-  });
-
-  test('resumeAppHangTracking does nothing when native is null', () async {
-    SentryFlutter.native = null;
-
-    // This should complete without throwing an error
-    await expectLater(SentryFlutter.resumeAppHangTracking(), completes);
-  });
-
-  test('pauseAppHangTracking calls native method when available', () async {
-    SentryFlutter.native = MockSentryNativeBinding();
-    when(SentryFlutter.native?.pauseAppHangTracking())
-        .thenAnswer((_) => Future.value());
-
-    await SentryFlutter.pauseAppHangTracking();
-
-    verify(SentryFlutter.native?.pauseAppHangTracking()).called(1);
-  });
-
-  test('pauseAppHangTracking does nothing when native is null', () async {
-    SentryFlutter.native = null;
-
-    // This should complete without throwing an error
-    await expectLater(SentryFlutter.pauseAppHangTracking(), completes);
-  });
 }
 
 void appRunner() {}
@@ -675,7 +639,7 @@ void loadTestPackage() {
 }
 
 PlatformChecker getPlatformChecker({
-  required Platform platform,
+  required MockPlatform platform,
   bool isWeb = false,
 }) {
   final platformChecker = PlatformChecker(

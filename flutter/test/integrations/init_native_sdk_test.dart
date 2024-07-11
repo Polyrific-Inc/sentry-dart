@@ -25,7 +25,7 @@ void main() {
     });
     var sut = fixture.getSut(channel);
 
-    await sut.init(fixture.options);
+    await sut.init(createOptions());
 
     channel.setMethodCallHandler(null);
 
@@ -76,7 +76,7 @@ void main() {
     });
     var sut = fixture.getSut(channel);
 
-    fixture.options
+    final options = createOptions()
       ..debug = false
       ..environment = 'foo'
       ..release = 'foo@bar+1'
@@ -106,10 +106,10 @@ void main() {
       ..readTimeout = Duration(milliseconds: 9002)
       ..appHangTimeoutInterval = Duration(milliseconds: 9003);
 
-    fixture.options.sdk.addIntegration('foo');
-    fixture.options.sdk.addPackage('bar', '1');
+    options.sdk.addIntegration('foo');
+    options.sdk.addPackage('bar', '1');
 
-    await sut.init(fixture.options);
+    await sut.init(options);
 
     channel.setMethodCallHandler(null);
 
@@ -177,9 +177,7 @@ SentryFlutterOptions createOptions() {
 }
 
 class Fixture {
-  late SentryFlutterOptions options;
   SentryNativeChannel getSut(MethodChannel native) {
-    options = createOptions();
-    return SentryNativeChannel(options, native);
+    return SentryNativeChannel(native);
   }
 }

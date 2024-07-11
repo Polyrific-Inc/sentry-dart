@@ -91,7 +91,6 @@ void main() {
       expect('email1', copy.email);
       expect('ipAddress1', copy.ipAddress);
       expect({'key1': 'value1'}, copy.data);
-      // ignore: deprecated_member_use_from_same_package
       expect('seg1', copy.segment);
     });
   });

@@ -106,9 +106,7 @@ class SentryBaggage {
     if (scope.user?.id != null) {
       setUserId(scope.user!.id!);
     }
-    // ignore: deprecated_member_use_from_same_package
     if (scope.user?.segment != null) {
-      // ignore: deprecated_member_use_from_same_package
       setUserSegment(scope.user!.segment!);
     }
   }
@@ -178,8 +176,6 @@ class SentryBaggage {
     set('sentry-user_id', value);
   }
 
-  @Deprecated(
-      'Will be removed in v9 since functionality has been removed from Sentry')
   void setUserSegment(String value) {
     set('sentry-user_segment', value);
   }
