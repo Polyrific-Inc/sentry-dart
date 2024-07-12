@@ -16,22 +16,19 @@ import io.sentry.Hint
 import io.sentry.HubAdapter
 import io.sentry.Sentry
 import io.sentry.SentryEvent
-import io.sentry.SentryLevel
 import io.sentry.SentryOptions
 import io.sentry.android.core.ActivityFramesTracker
-import io.sentry.android.core.AppStartState
-import io.sentry.android.core.BuildConfig.VERSION_NAME
+import io.sentry.android.core.InternalSentrySdk
 import io.sentry.android.core.LoadClass
 import io.sentry.android.core.SentryAndroid
 import io.sentry.android.core.SentryAndroidOptions
+import io.sentry.android.core.performance.AppStartMetrics
+import io.sentry.android.core.performance.TimeSpan
 import io.sentry.protocol.DebugImage
 import io.sentry.protocol.SdkVersion
 import io.sentry.protocol.SentryId
 import io.sentry.protocol.User
-import java.io.File
 import java.lang.ref.WeakReference
-import java.util.Locale
-import java.util.UUID
 
 class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel: MethodChannel
@@ -40,16 +37,20 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
   private var activity: WeakReference<Activity>? = null
   private var framesTracker: ActivityFramesTracker? = null
+  private var pluginRegistrationTime: Long? = null
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+    pluginRegistrationTime = System.currentTimeMillis()
+
     context = flutterPluginBinding.applicationContext
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "sentry_flutter")
     channel.setMethodCallHandler(this)
 
-    sentryFlutter = SentryFlutter(
-      androidSdk = androidSdk,
-      nativeSdk = nativeSdk
-    )
+    sentryFlutter =
+      SentryFlutter(
+        androidSdk = androidSdk,
+        nativeSdk = nativeSdk,
+      )
   }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
@@ -70,6 +71,7 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
       "removeExtra" -> removeExtra(call.argument("key"), result)
       "setTag" -> setTag(call.argument("key"), call.argument("value"), result)
       "removeTag" -> removeTag(call.argument("key"), result)
+      "loadContexts" -> loadContexts(result)
       else -> result.notImplemented()
     }
   }
@@ -97,18 +99,6 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
   override fun onDetachedFromActivityForConfigChanges() {
     // Stub
-  }
-
-  private fun writeEnvelope(envelope: ByteArray): Boolean {
-    val options = HubAdapter.getInstance().options
-    if (options.outboxPath.isNullOrEmpty()) {
-      return false
-    }
-
-    val file = File(options.outboxPath, UUID.randomUUID().toString())
-    file.writeBytes(envelope)
-
-    return true
   }
 
   private fun initNativeSdk(call: MethodCall, result: Result) {
@@ -140,22 +130,64 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
       result.success(null)
       return
     }
-    val appStartTime = AppStartState.getInstance().appStartTime
-    val isColdStart = AppStartState.getInstance().isColdStart
+
+    val appStartMetrics = AppStartMetrics.getInstance()
+
+    val appStartTimeSpan = appStartMetrics.appStartTimeSpan
+    val appStartTime = appStartTimeSpan.startTimestamp
+    val isColdStart = appStartMetrics.appStartType == AppStartMetrics.AppStartType.COLD
 
     if (appStartTime == null) {
       Log.w("Sentry", "App start won't be sent due to missing appStartTime")
       result.success(null)
-    } else if (isColdStart == null) {
-      Log.w("Sentry", "App start won't be sent due to missing isColdStart")
-      result.success(null)
     } else {
       val appStartTimeMillis = DateUtils.nanosToMillis(appStartTime.nanoTimestamp().toDouble())
-      val item = mapOf<String, Any?>(
-        "appStartTime" to appStartTimeMillis,
-        "isColdStart" to isColdStart
-      )
+      val item =
+        mutableMapOf<String, Any?>(
+          "pluginRegistrationTime" to pluginRegistrationTime,
+          "appStartTime" to appStartTimeMillis,
+          "isColdStart" to isColdStart,
+        )
+
+      val androidNativeSpans = mutableMapOf<String, Any?>()
+
+      val processInitSpan =
+        TimeSpan().apply {
+          description = "Process Initialization"
+          setStartUnixTimeMs(appStartTimeSpan.startTimestampMs)
+          setStartedAt(appStartTimeSpan.startUptimeMs)
+          setStoppedAt(appStartMetrics.classLoadedUptimeMs)
+        }
+      processInitSpan.addToMap(androidNativeSpans)
+
+      val applicationOnCreateSpan = appStartMetrics.applicationOnCreateTimeSpan
+      applicationOnCreateSpan.addToMap(androidNativeSpans)
+
+      val contentProviderSpans = appStartMetrics.contentProviderOnCreateTimeSpans
+      contentProviderSpans.forEach { span ->
+        span.addToMap(androidNativeSpans)
+      }
+
+      appStartMetrics.activityLifecycleTimeSpans.forEach { span ->
+        span.onCreate.addToMap(androidNativeSpans)
+        span.onStart.addToMap(androidNativeSpans)
+      }
+
+      item["nativeSpanTimes"] = androidNativeSpans
+
       result.success(item)
+    }
+  }
+
+  private fun TimeSpan.addToMap(map: MutableMap<String, Any?>) {
+    if (startTimestamp == null) return
+
+    description?.let { description ->
+      map[description] =
+        mapOf<String, Any?>(
+          "startTimestampMsSinceEpoch" to startTimestampMs,
+          "stopTimestampMsSinceEpoch" to projectedStopTimestampMs,
+        )
     }
   }
 
@@ -194,7 +226,7 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
       val frames = mapOf<String, Any?>(
         "totalFrames" to total,
         "slowFrames" to slow,
-        "frozenFrames" to frozen
+        "frozenFrames" to frozen,
       )
       result.success(frames)
     }
@@ -295,20 +327,19 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
       result.error("1", "The Sentry Android SDK is disabled", null)
       return
     }
-
-    val args = call.arguments() as List<Any>? ?: listOf<Any>()
+    val args = call.arguments() as List<Any>? ?: listOf()
     if (args.isNotEmpty()) {
       val event = args.first() as ByteArray?
-
       if (event != null && event.isNotEmpty()) {
-        if (!writeEnvelope(event)) {
-          result.error("2", "SentryOptions or outboxPath are null or empty", null)
+        val id = InternalSentrySdk.captureEnvelope(event)
+        if (id != null) {
+          result.success("")
+        } else {
+          result.error("2", "Failed to capture envelope", null)
         }
-        result.success("")
         return
       }
     }
-
     result.error("3", "Envelope is null or empty", null)
   }
 
@@ -346,7 +377,7 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   private class BeforeSendCallbackImpl(
-    private val sdkVersion: SdkVersion?
+    private val sdkVersion: SdkVersion?,
   ) : SentryOptions.BeforeSendCallback {
     override fun execute(event: SentryEvent, hint: Hint): SentryEvent {
       setEventOriginTag(event)
@@ -374,7 +405,7 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun setEventEnvironmentTag(
       event: SentryEvent,
       origin: String = "android",
-      environment: String
+      environment: String,
     ) {
       event.setTag("event.origin", origin)
       event.setTag("event.environment", environment)
@@ -392,5 +423,21 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
       }
     }
+  }
+
+  private fun loadContexts(result: Result) {
+    val options = HubAdapter.getInstance().options
+    if (options !is SentryAndroidOptions) {
+      result.success(null)
+      return
+    }
+    val currentScope = InternalSentrySdk.getCurrentScope()
+    val serializedScope =
+      InternalSentrySdk.serializeScope(
+        context,
+        options,
+        currentScope,
+      )
+    result.success(serializedScope)
   }
 }

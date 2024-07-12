@@ -10,7 +10,7 @@ Sentry integration for `drift` package
 
 | package     | build                                                                                                                                                                             | pub                                                                                                  | likes                                                                                                | popularity                                                                                                     | pub points |
 |-------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------| ------- |
-| sentry_drift | [![build](https://github.com/getsentry/sentry-dart/workflows/sentry-drift/badge.svg?branch=main)](https://github.com/getsentry/sentry-dart/actions?query=workflow%3Asentry-drift) | [![pub package](https://img.shields.io/pub/v/sentry_drift.svg)](https://pub.dev/packages/sentry_drift) | [![likes](https://img.shields.io/pub/likes/sentry_drift)](https://pub.dev/packages/sentry_drift/score) | [![popularity](https://img.shields.io/pub/popularity/sentry_drift)](https://pub.dev/packages/sentry_drift/score) | [![pub points](https://img.shields.io/pub/points/sentry_drift)](https://pub.dev/packages/sentry_drift/score)
+| sentry_drift | [![build](https://github.com/getsentry/sentry-dart/actions/workflows/drift.yml/badge.svg?branch=main)](https://github.com/getsentry/sentry-dart/actions?query=workflow%3Asentry-drift) | [![pub package](https://img.shields.io/pub/v/sentry_drift.svg)](https://pub.dev/packages/sentry_drift) | [![likes](https://img.shields.io/pub/likes/sentry_drift)](https://pub.dev/packages/sentry_drift/score) | [![popularity](https://img.shields.io/pub/popularity/sentry_drift)](https://pub.dev/packages/sentry_drift/score) | [![pub points](https://img.shields.io/pub/points/sentry_drift)](https://pub.dev/packages/sentry_drift/score)
 
 Integration for the [`drift`](https://pub.dev/packages/drift) package.
 
@@ -74,8 +74,9 @@ Future<void> runApp() async {
 
 #### Resources
 
-* [![Documentation](https://img.shields.io/badge/documentation-sentry.io-green.svg)](https://docs.sentry.io/platforms/dart/)
-* [![Forum](https://img.shields.io/badge/forum-sentry-green.svg)](https://forum.sentry.io/c/sdks)
-* [![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/Ww9hbqr)
+* [![Flutter docs](https://img.shields.io/badge/documentation-sentry.io-green.svg?label=flutter%20docs)](https://docs.sentry.io/platforms/flutter/)
+* [![Dart docs](https://img.shields.io/badge/documentation-sentry.io-green.svg?label=dart%20docs)](https://docs.sentry.io/platforms/dart/)
+* [![Discussions](https://img.shields.io/github/discussions/getsentry/sentry-dart.svg)](https://github.com/getsentry/sentry-dart/discussions)
+* [![Discord Chat](https://img.shields.io/discord/621778831602221064?logo=discord&logoColor=ffffff&color=7389D8)](https://discord.gg/PXa5Apfe7K)
 * [![Stack Overflow](https://img.shields.io/badge/stack%20overflow-sentry-green.svg)](https://stackoverflow.com/questions/tagged/sentry)
 * [![Twitter Follow](https://img.shields.io/twitter/follow/getsentry?label=getsentry&style=social)](https://twitter.com/intent/follow?screen_name=getsentry)

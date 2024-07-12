@@ -69,12 +69,15 @@ class SentryIsolate {
             stackTrace == null ? null : StackTrace.fromString(stackTrace),
       );
 
-      //  Isolate errors don't crash the App.
-      final mechanism = Mechanism(type: 'isolateError', handled: true);
+      //  Isolate errors don't crash the app, but is not handled by the user.
+      final mechanism = Mechanism(type: 'isolateError', handled: false);
       final throwableMechanism = ThrowableMechanism(mechanism, throwable);
+
       final event = SentryEvent(
         throwable: throwableMechanism,
-        level: SentryLevel.fatal,
+        level: hub.options.markAutomaticallyCollectedErrorsAsFatal
+            ? SentryLevel.fatal
+            : SentryLevel.error,
         timestamp: hub.options.clock(),
       );
 

@@ -1,3 +1,5 @@
+import 'utils/stacktrace_utils.dart';
+
 import 'recursive_exception_cause_extractor.dart';
 import 'protocol.dart';
 import 'sentry_options.dart';
@@ -38,10 +40,9 @@ class SentryExceptionFactory {
     // hence we check again if stackTrace is null and if not, read the current stack trace
     // but only if attachStacktrace is enabled
     if (_options.attachStacktrace) {
-      // TODO: snapshot=true if stackTrace is null
-      // Requires a major breaking change because of grouping
       if (stackTrace == null || stackTrace == StackTrace.empty) {
-        stackTrace = StackTrace.current;
+        snapshot = true;
+        stackTrace = getCurrentStackTrace();
       }
     }
 

@@ -7,18 +7,16 @@ EnricherEventProcessor enricherEventProcessor(SentryOptions options) {
   return IoEnricherEventProcessor(options);
 }
 
-/// Enriches [SentryEvents] with various kinds of information.
+/// Enriches [SentryEvent]s with various kinds of information.
 /// Uses Darts [Platform](https://api.dart.dev/stable/dart-io/Platform-class.html)
 /// class to read information.
 class IoEnricherEventProcessor implements EnricherEventProcessor {
-  IoEnricherEventProcessor(
-    this._options,
-  );
+  IoEnricherEventProcessor(this._options);
 
   final SentryOptions _options;
 
   @override
-  SentryEvent? apply(SentryEvent event, {Hint? hint}) {
+  SentryEvent? apply(SentryEvent event, Hint hint) {
     // If there's a native integration available, it probably has better
     // information available than Flutter.
 

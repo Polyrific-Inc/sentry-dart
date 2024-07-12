@@ -13,7 +13,7 @@ pubspec.lock
 build/
 .cxx/
 .vscode/
-
+.fvm/
 
 .test_coverage.dart
 dart/coverage/*
@@ -24,6 +24,7 @@ flutter/coverage/*
 sqflite/coverage/*
 drift/coverage/*
 hive/coverage/*
+isar/coverage/*
 
 pubspec.lock
 Podfile.lock

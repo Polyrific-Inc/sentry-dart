@@ -1,4 +1,5 @@
 @TestOn('vm')
+library flutter_test;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,7 +82,7 @@ void main() {
     e.contexts.operatingSystem = SentryOperatingSystem(theme: 'theme1');
     e.contexts.app = SentryApp(inForeground: true);
 
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(fixture.called, true);
     expect(event?.contexts.device?.name, 'Device1');
@@ -121,7 +122,7 @@ void main() {
     final e =
         SentryEvent(contexts: eventContexts, user: SentryUser(id: 'myId'));
 
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(fixture.called, true);
     expect(event?.contexts.device?.name, 'eDevice');
@@ -145,7 +146,8 @@ void main() {
       integration(fixture.hub, fixture.options);
 
       final e = getEvent();
-      final event = await fixture.options.eventProcessors.first.apply(e);
+      final event =
+          await fixture.options.eventProcessors.first.apply(e, Hint());
 
       expect(
         event?.sdk?.packages.any((element) => element.name == 'native-package'),
@@ -169,7 +171,8 @@ void main() {
       integration(fixture.hub, fixture.options);
 
       final e = getEvent();
-      final event = await fixture.options.eventProcessors.first.apply(e);
+      final event =
+          await fixture.options.eventProcessors.first.apply(e, Hint());
 
       expect(
           event?.sdk?.integrations
@@ -189,7 +192,8 @@ void main() {
       integration(fixture.hub, fixture.options);
 
       final e = getEvent();
-      final event = await fixture.options.eventProcessors.first.apply(e);
+      final event =
+          await fixture.options.eventProcessors.first.apply(e, Hint());
 
       expect(
           event?.sdk?.packages
@@ -210,7 +214,8 @@ void main() {
       integration(fixture.hub, fixture.options);
 
       final e = getEvent();
-      final event = await fixture.options.eventProcessors.first.apply(e);
+      final event =
+          await fixture.options.eventProcessors.first.apply(e, Hint());
 
       expect(
           event?.sdk?.packages
@@ -239,7 +244,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = SentryEvent();
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event, isNotNull);
   });
@@ -252,7 +257,8 @@ void main() {
 
       final eventSdk = getSdkVersion(name: 'sentry.dart.flutter');
       final e = getEvent(sdk: eventSdk);
-      final event = await fixture.options.eventProcessors.first.apply(e);
+      final event =
+          await fixture.options.eventProcessors.first.apply(e, Hint());
 
       expect(event?.tags?['event.origin'], 'flutter');
       expect(event?.tags?['event.environment'], 'dart');
@@ -270,7 +276,8 @@ void main() {
         sdk: eventSdk,
         tags: {'a': 'b'},
       );
-      final event = await fixture.options.eventProcessors.first.apply(e);
+      final event =
+          await fixture.options.eventProcessors.first.apply(e, Hint());
 
       expect(event?.tags?['event.origin'], 'flutter');
       expect(event?.tags?['event.environment'], 'dart');
@@ -285,7 +292,8 @@ void main() {
       integration(fixture.hub, fixture.options);
 
       final e = getEvent(tags: {});
-      final event = await fixture.options.eventProcessors.first.apply(e);
+      final event =
+          await fixture.options.eventProcessors.first.apply(e, Hint());
 
       expect(event?.tags?.containsKey('event.origin'), false);
       expect(event?.tags?.containsKey('event.environment'), false);
@@ -298,7 +306,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent(tags: {'key': 'flutter', 'key-a': 'flutter'});
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.tags?['key'], 'flutter');
     expect(event?.tags?['key-a'], 'flutter');
@@ -311,7 +319,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent(extra: {'key': 'flutter', 'key-a': 'flutter'});
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     // ignore: deprecated_member_use
     expect(event?.extra?['key'], 'flutter');
@@ -326,7 +334,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent();
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.user?.id, '196E065A-AAF7-409A-9A6C-A81F40274CB9');
     expect(event?.user?.username, 'fixture-username');
@@ -340,7 +348,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent(user: SentryUser(id: 'abc'));
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.user?.id, 'abc');
   });
@@ -350,7 +358,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent();
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.dist, 'fixture-dist');
   });
@@ -360,7 +368,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent(dist: 'abc');
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.dist, 'abc');
   });
@@ -370,7 +378,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent();
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.environment, 'fixture-environment');
   });
@@ -380,7 +388,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent(environment: 'abc');
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.environment, 'abc');
   });
@@ -391,7 +399,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent(fingerprint: ['fingerprint-a', 'fingerprint-b']);
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.fingerprint, ['fingerprint-a', 'fingerprint-b']);
   });
@@ -401,7 +409,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent();
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.level, SentryLevel.error);
   });
@@ -411,7 +419,7 @@ void main() {
     integration(fixture.hub, fixture.options);
 
     final e = getEvent(level: SentryLevel.fatal);
-    final event = await fixture.options.eventProcessors.first.apply(e);
+    final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
     expect(event?.level, SentryLevel.fatal);
   });

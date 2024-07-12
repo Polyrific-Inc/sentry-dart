@@ -20,7 +20,7 @@ class ScreenshotEventProcessor implements EventProcessor {
       sentryScreenshotWidgetGlobalKey.currentContext != null;
 
   @override
-  Future<SentryEvent?> apply(SentryEvent event, {Hint? hint}) async {
+  Future<SentryEvent?> apply(SentryEvent event, Hint hint) async {
     if (event is SentryTransaction) {
       return event;
     }
@@ -29,6 +29,32 @@ class ScreenshotEventProcessor implements EventProcessor {
         event.throwable == null &&
         _hasSentryScreenshotWidget) {
       return event;
+    }
+    final beforeScreenshot = _options.beforeScreenshot;
+    if (beforeScreenshot != null) {
+      try {
+        final result = beforeScreenshot(event, hint: hint);
+        bool takeScreenshot;
+        if (result is Future<bool>) {
+          takeScreenshot = await result;
+        } else {
+          takeScreenshot = result;
+        }
+        if (!takeScreenshot) {
+          return event;
+        }
+      } catch (exception, stackTrace) {
+        _options.logger(
+          SentryLevel.error,
+          'The beforeScreenshot callback threw an exception',
+          exception: exception,
+          stackTrace: stackTrace,
+        );
+        // ignore: invalid_use_of_internal_member
+        if (_options.automatedTestMode) {
+          rethrow;
+        }
+      }
     }
 
     final renderer = _options.rendererWrapper.getRenderer();
@@ -52,7 +78,7 @@ class ScreenshotEventProcessor implements EventProcessor {
 
     final bytes = await _createScreenshot();
     if (bytes != null) {
-      hint?.screenshot = SentryAttachment.fromScreenshotData(bytes);
+      hint.screenshot = SentryAttachment.fromScreenshotData(bytes);
     }
     return event;
   }

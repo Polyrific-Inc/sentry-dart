@@ -1,4 +1,5 @@
 @TestOn('vm')
+library flutter_test;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -135,7 +136,7 @@ void main() {
 
           final ep = fixture.options.eventProcessors.first;
           SentryEvent? event = _getEvent();
-          event = await ep.apply(event);
+          event = await ep.apply(event, Hint());
 
           expect(1, event!.debugMeta!.images.length);
         });
@@ -146,7 +147,7 @@ void main() {
           sut.call(fixture.hub, fixture.options);
           final ep = fixture.options.eventProcessors.first;
           SentryEvent? event = _getEvent();
-          event = await ep.apply(event);
+          event = await ep.apply(event, Hint());
 
           final image = event!.debugMeta!.images.first;
 
@@ -187,12 +188,7 @@ void main() {
 SentryEvent _getEvent() {
   final frame = SentryStackFrame(platform: 'native');
   final st = SentryStackTrace(frames: [frame]);
-  final ex = SentryException(
-    type: 'type',
-    value: 'value',
-    stackTrace: st,
-  );
-  return SentryEvent(exceptions: [ex]);
+  return SentryEvent(threads: [SentryThread(stacktrace: st)]);
 }
 
 class Fixture {

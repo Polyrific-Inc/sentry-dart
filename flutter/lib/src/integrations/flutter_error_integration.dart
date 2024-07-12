@@ -54,16 +54,15 @@ class FlutterErrorIntegration implements Integration<SentryFlutterOptions> {
           stackTrace: errorDetails.stack,
         );
 
-        // FlutterError doesn't crash the App.
-        final mechanism = Mechanism(
-          type: 'FlutterError',
-          handled: true,
-        );
+        // FlutterError doesn't crash the app, but is not handled by the user.
+        final mechanism = Mechanism(type: 'FlutterError', handled: false);
         final throwableMechanism = ThrowableMechanism(mechanism, exception);
 
         var event = SentryEvent(
           throwable: throwableMechanism,
-          level: SentryLevel.fatal,
+          level: options.markAutomaticallyCollectedErrorsAsFatal
+              ? SentryLevel.fatal
+              : SentryLevel.error,
           contexts: flutterErrorDetails.isNotEmpty
               ? (Contexts()..['flutter_error_details'] = flutterErrorDetails)
               : null,
