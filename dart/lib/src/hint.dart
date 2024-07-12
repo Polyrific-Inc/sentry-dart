@@ -1,4 +1,5 @@
 import 'sentry_attachment/sentry_attachment.dart';
+import 'sentry_options.dart';
 
 /// Hints are used in [BeforeSendCallback], [BeforeBreadcrumbCallback] and
 /// event processors.
@@ -11,8 +12,8 @@ import 'sentry_attachment/sentry_attachment.dart';
 /// Example:
 ///
 /// ```dart
-/// options.beforeSend = (event, {hint}) {
-///     final syntheticException = hint?.get(TypeCheckHint.syntheticException);
+/// options.beforeSend = (event, hint) {
+///     final syntheticException = hint.get(TypeCheckHint.syntheticException);
 ///     if (syntheticException is FlutterErrorDetails) {
 ///       // Do something with hint data
 ///     }
@@ -28,19 +29,19 @@ import 'sentry_attachment/sentry_attachment.dart';
 /// ```dart
 /// import 'dart:convert';
 ///
-/// options.beforeSend = (event, {hint}) {
+/// options.beforeSend = (event, hint) {
 ///   final text = 'This event should not be sent happen in prod. Investigate.';
 ///   final textAttachment = SentryAttachment.fromIntList(
 ///     utf8.encode(text),
 ///     'event_info.txt',
 ///     contentType: 'text/plain',
 ///   );
-///   hint?.attachments.add(textAttachment);
+///   hint.attachments.add(textAttachment);
 ///   return event;
 /// };
 /// ```
 class Hint {
-  final Map<String, Object> _internalStorage = {};
+  final Map<String, dynamic> _internalStorage = {};
 
   final List<SentryAttachment> attachments = [];
 
@@ -62,7 +63,7 @@ class Hint {
     return hint;
   }
 
-  factory Hint.withMap(Map<String, Object> map) {
+  factory Hint.withMap(Map<String, dynamic> map) {
     final hint = Hint();
     hint.addAll(map);
     return hint;
@@ -80,17 +81,19 @@ class Hint {
     return hint;
   }
 
-  // Objects
+  // Key/Value Storage
 
-  void addAll(Map<String, Object> keysAndValues) {
-    _internalStorage.addAll(keysAndValues);
+  void addAll(Map<String, dynamic> keysAndValues) {
+    final withoutNullValues =
+        keysAndValues.map((key, value) => MapEntry(key, value ?? "null"));
+    _internalStorage.addAll(withoutNullValues);
   }
 
-  void set(String key, Object value) {
-    _internalStorage[key] = value;
+  void set(String key, dynamic value) {
+    _internalStorage[key] = value ?? "null";
   }
 
-  Object? get(String key) {
+  dynamic get(String key) {
     return _internalStorage[key];
   }
 

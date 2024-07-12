@@ -1,4 +1,5 @@
 @TestOn('vm')
+library flutter_test;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,7 +59,8 @@ void main() {
 
       final integration = LoadContextsIntegration(fixture.methodChannel);
       integration.call(fixture.hub, fixture.options);
-      event = (await fixture.options.eventProcessors.first.apply(event))!;
+      event =
+          (await fixture.options.eventProcessors.first.apply(event, Hint()))!;
 
       expect(event.breadcrumbs!.length, 1);
       expect(event.breadcrumbs!.first.message, 'native');
@@ -83,10 +85,87 @@ void main() {
 
       final integration = LoadContextsIntegration(fixture.methodChannel);
       integration.call(fixture.hub, fixture.options);
-      event = (await fixture.options.eventProcessors.first.apply(event))!;
+      event =
+          (await fixture.options.eventProcessors.first.apply(event, Hint()))!;
 
       expect(event.breadcrumbs!.length, 1);
       expect(event.breadcrumbs!.first.message, 'event');
+    });
+
+    test('apply beforeBreadcrumb to native breadcrumbs', () async {
+      fixture.options.enableScopeSync = true;
+      fixture.options.beforeBreadcrumb = (breadcrumb, hint) {
+        if (breadcrumb?.message == 'native-mutated') {
+          return breadcrumb?.copyWith(message: 'native-mutated-applied');
+        } else {
+          return null;
+        }
+      };
+
+      final eventBreadcrumb = Breadcrumb(message: 'event');
+      var event = SentryEvent(breadcrumbs: [eventBreadcrumb]);
+
+      final nativeMutatedBreadcrumb = Breadcrumb(message: 'native-mutated');
+      final nativeDeletedBreadcrumb = Breadcrumb(message: 'native-deleted');
+      Map<String, dynamic> loadContexts = {
+        'breadcrumbs': [
+          nativeMutatedBreadcrumb.toJson(),
+          nativeDeletedBreadcrumb.toJson(),
+        ]
+      };
+
+      final future = Future.value(loadContexts);
+      when(fixture.methodChannel.invokeMethod<dynamic>('loadContexts'))
+          .thenAnswer((_) => future);
+      // ignore: deprecated_member_use
+      _channel.setMockMethodCallHandler((MethodCall methodCall) async {});
+
+      final integration = LoadContextsIntegration(fixture.methodChannel);
+      integration.call(fixture.hub, fixture.options);
+      event =
+          (await fixture.options.eventProcessors.first.apply(event, Hint()))!;
+
+      expect(event.breadcrumbs!.length, 1);
+      expect(event.breadcrumbs!.first.message, 'native-mutated-applied');
+    });
+
+    test('apply default IP to user during captureEvent after loading context',
+        () async {
+      fixture.options.enableScopeSync = true;
+
+      const expectedIp = '{{auto}}';
+      String? actualIp;
+
+      const expectedId = '1';
+      String? actualId;
+
+      fixture.options.beforeSend = (event, hint) {
+        actualIp = event.user?.ipAddress;
+        actualId = event.user?.id;
+        return event;
+      };
+
+      final options = fixture.options;
+
+      final user = SentryUser(id: expectedId);
+      Map<String, dynamic> loadContexts = {'user': user.toJson()};
+      final future = Future.value(loadContexts);
+      when(fixture.methodChannel.invokeMethod<dynamic>('loadContexts'))
+          .thenAnswer((_) => future);
+      // ignore: deprecated_member_use
+      _channel.setMockMethodCallHandler((MethodCall methodCall) async {});
+
+      final integration = LoadContextsIntegration(fixture.methodChannel);
+      options.addIntegration(integration);
+      options.integrations.first.call(fixture.hub, options);
+
+      final client = SentryClient(options);
+      final event = SentryEvent();
+
+      await client.captureEvent(event);
+
+      expect(expectedIp, actualIp);
+      expect(expectedId, actualId);
     });
   });
 }

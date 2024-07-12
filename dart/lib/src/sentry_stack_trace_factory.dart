@@ -5,7 +5,7 @@ import 'noop_origin.dart' if (dart.library.html) 'origin.dart';
 import 'protocol.dart';
 import 'sentry_options.dart';
 
-/// converts [StackTrace] to [SentryStackFrames]
+/// converts [StackTrace] to [SentryStackFrame]s
 class SentryStackTraceFactory {
   final SentryOptions _options;
 
@@ -14,14 +14,6 @@ class SentryStackTraceFactory {
 
   static final SentryStackFrame _asynchronousGapFrameJson =
       SentryStackFrame(absPath: '<asynchronous suspension>');
-
-  static const _sentryPackagesIdentifier = <String>[
-    'sentry',
-    'sentry_flutter',
-    'sentry_logging',
-    'sentry_dio',
-    'sentry_file',
-  ];
 
   SentryStackTraceFactory(this._options);
 
@@ -34,13 +26,9 @@ class SentryStackTraceFactory {
     for (var t = 0; t < chain.traces.length; t += 1) {
       final trace = chain.traces[t];
 
+      // NOTE: We want to keep the Sentry frames for crash detection
+      // this does not affect grouping since they're not marked as inApp
       for (final frame in trace.frames) {
-        // we don't want to add our own frames
-        if (frame.package != null &&
-            _sentryPackagesIdentifier.contains(frame.package)) {
-          continue;
-        }
-
         final stackTraceFrame = encodeStackTraceFrame(frame);
         if (stackTraceFrame != null) {
           frames.add(stackTraceFrame);
@@ -123,16 +111,18 @@ class SentryStackTraceFactory {
       absPath: abs,
       function: member,
       // https://docs.sentry.io/development/sdk-dev/features/#in-app-frames
-      inApp: isInApp(frame),
+      inApp: _isInApp(frame),
       fileName: fileName,
       package: frame.package,
     );
 
-    if (frame.line != null && frame.line! >= 0) {
+    final line = frame.line;
+    if (line != null && line >= 0) {
       sentryStackFrame = sentryStackFrame.copyWith(lineNo: frame.line);
     }
 
-    if (frame.column != null && frame.column! >= 0) {
+    final column = frame.column;
+    if (column != null && column >= 0) {
       sentryStackFrame = sentryStackFrame.copyWith(colNo: frame.column);
     }
     return sentryStackFrame;
@@ -153,11 +143,11 @@ class SentryStackTraceFactory {
       return frame.uri.pathSegments.last;
     }
 
-    return '${frame.uri}';
+    return frame.uri.toString();
   }
 
   /// whether this frame comes from the app and not from Dart core or 3rd party librairies
-  bool isInApp(Frame frame) {
+  bool _isInApp(Frame frame) {
     final scheme = frame.uri.scheme;
 
     if (scheme.isEmpty) {

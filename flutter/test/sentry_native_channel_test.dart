@@ -1,6 +1,7 @@
 // ignore_for_file: inference_failure_on_function_invocation
 
 @TestOn('vm')
+library flutter_test;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
@@ -20,8 +21,11 @@ void main() {
 
     test('fetchNativeAppStart', () async {
       final map = <String, dynamic>{
+        'pluginRegistrationTime': 1,
         'appStartTime': 0.1,
         'isColdStart': true,
+        // ignore: inference_failure_on_collection_literal
+        'nativeSpanTimes': {},
       };
       final future = Future.value(map);
 

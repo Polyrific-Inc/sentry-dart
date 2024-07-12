@@ -1,4 +1,5 @@
 @Tags(['canvasKit']) // Web renderer where this test can run
+library flutter_test;
 
 import 'dart:math';
 import 'dart:ui';
@@ -13,6 +14,9 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Fixture fixture;
+
+  late SentryEvent event;
+  late Hint hint;
 
   setUp(() {
     fixture = Fixture();
@@ -30,13 +34,14 @@ void main() {
       final sut = fixture.getSut(renderer, isWeb);
 
       await tester.pumpWidget(SentryScreenshotWidget(
+          hub: fixture.hub,
           child: Text('Catching Pokémon is a snap!',
               textDirection: TextDirection.ltr)));
 
       final throwable = Exception();
-      final event = SentryEvent(throwable: throwable);
-      final hint = Hint();
-      await sut.apply(event, hint: hint);
+      event = SentryEvent(throwable: throwable);
+      hint = Hint();
+      await sut.apply(event, hint);
 
       expect(hint.screenshot != null, added);
       if (expectedMaxWidthOrHeight != null) {
@@ -91,10 +96,97 @@ void main() {
     await _addScreenshotAttachment(tester, null,
         added: true, isWeb: false, expectedMaxWidthOrHeight: widthOrHeight);
   });
+
+  group('beforeScreenshot', () {
+    testWidgets('does add screenshot if beforeScreenshot returns true',
+        (tester) async {
+      fixture.options.beforeScreenshot = (SentryEvent event, {Hint? hint}) {
+        return true;
+      };
+      await _addScreenshotAttachment(tester, FlutterRenderer.canvasKit,
+          added: true, isWeb: false);
+    });
+
+    testWidgets('does add screenshot if async beforeScreenshot returns true',
+        (tester) async {
+      fixture.options.beforeScreenshot =
+          (SentryEvent event, {Hint? hint}) async {
+        await Future<void>.delayed(Duration(milliseconds: 1));
+        return true;
+      };
+      await _addScreenshotAttachment(tester, FlutterRenderer.canvasKit,
+          added: true, isWeb: false);
+    });
+
+    testWidgets('does not add screenshot if beforeScreenshot returns false',
+        (tester) async {
+      fixture.options.beforeScreenshot = (SentryEvent event, {Hint? hint}) {
+        return false;
+      };
+      await _addScreenshotAttachment(tester, FlutterRenderer.canvasKit,
+          added: false, isWeb: false);
+    });
+
+    testWidgets(
+        'does not add screenshot if async beforeScreenshot returns false',
+        (tester) async {
+      fixture.options.beforeScreenshot =
+          (SentryEvent event, {Hint? hint}) async {
+        await Future<void>.delayed(Duration(milliseconds: 1));
+        return false;
+      };
+      await _addScreenshotAttachment(tester, FlutterRenderer.canvasKit,
+          added: false, isWeb: false);
+    });
+
+    testWidgets('does add screenshot if beforeScreenshot throws',
+        (tester) async {
+      fixture.options.beforeScreenshot = (SentryEvent event, {Hint? hint}) {
+        throw Error();
+      };
+      await _addScreenshotAttachment(tester, FlutterRenderer.canvasKit,
+          added: true, isWeb: false);
+    });
+
+    testWidgets('does add screenshot if async beforeScreenshot throws',
+        (tester) async {
+      fixture.options.beforeScreenshot =
+          (SentryEvent event, {Hint? hint}) async {
+        await Future<void>.delayed(Duration(milliseconds: 1));
+        throw Error();
+      };
+      await _addScreenshotAttachment(tester, FlutterRenderer.canvasKit,
+          added: true, isWeb: false);
+    });
+
+    testWidgets('passes event & hint to beforeScreenshot callback',
+        (tester) async {
+      SentryEvent? beforeScreenshotEvent;
+      Hint? beforeScreenshotHint;
+
+      fixture.options.beforeScreenshot = (SentryEvent event, {Hint? hint}) {
+        beforeScreenshotEvent = event;
+        beforeScreenshotHint = hint;
+        return true;
+      };
+
+      await _addScreenshotAttachment(tester, FlutterRenderer.canvasKit,
+          added: true, isWeb: false);
+
+      expect(beforeScreenshotEvent, event);
+      expect(beforeScreenshotHint, hint);
+    });
+  });
 }
 
 class Fixture {
+  late Hub hub;
   SentryFlutterOptions options = SentryFlutterOptions(dsn: fakeDsn);
+
+  Fixture() {
+    options.attachScreenshot = true;
+    hub = Hub(options);
+  }
 
   ScreenshotEventProcessor getSut(
       FlutterRenderer? flutterRenderer, bool isWeb) {

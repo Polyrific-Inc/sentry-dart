@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
@@ -9,6 +8,9 @@ import '../sentry_flutter.dart';
 import 'event_processor/android_platform_exception_event_processor.dart';
 import 'event_processor/flutter_exception_event_processor.dart';
 import 'event_processor/platform_exception_event_processor.dart';
+import 'event_processor/widget_event_processor.dart';
+import 'frame_callback_handler.dart';
+import 'integrations/connectivity/connectivity_integration.dart';
 import 'integrations/screenshot_integration.dart';
 import 'native/factory.dart';
 import 'native/native_scope_observer.dart';
@@ -32,6 +34,11 @@ typedef FlutterOptionsConfiguration = FutureOr<void> Function(
 mixin SentryFlutter {
   static const _channel = MethodChannel('sentry_flutter');
 
+  /// Represents the time when the Sentry init set up has started.
+  @internal
+  // ignore: invalid_use_of_internal_member
+  static DateTime? sentrySetupStartTime;
+
   static Future<void> init(
     FlutterOptionsConfiguration optionsConfiguration, {
     AppRunner? appRunner,
@@ -40,6 +47,9 @@ mixin SentryFlutter {
     @internal RendererWrapper? rendererWrapper,
   }) async {
     final flutterOptions = SentryFlutterOptions();
+
+    // ignore: invalid_use_of_internal_member
+    sentrySetupStartTime ??= flutterOptions.clock();
 
     if (platformChecker != null) {
       flutterOptions.platformChecker = platformChecker;
@@ -109,12 +119,13 @@ mixin SentryFlutter {
       options.addScopeObserver(NativeScopeObserver(_native!));
     }
 
-    var flutterEventProcessor = FlutterEnricherEventProcessor(options);
-    options.addEventProcessor(flutterEventProcessor);
+    options.addEventProcessor(FlutterEnricherEventProcessor(options));
+    options.addEventProcessor(WidgetEventProcessor());
 
     if (options.platformChecker.platform.isAndroid) {
-      options
-          .addEventProcessor(AndroidPlatformExceptionEventProcessor(options));
+      options.addEventProcessor(
+        AndroidPlatformExceptionEventProcessor(options),
+      );
     }
 
     options.addEventProcessor(PlatformExceptionEventProcessor());
@@ -150,14 +161,14 @@ mixin SentryFlutter {
     // The ordering here matters, as we'd like to first start the native integration.
     // That allow us to send events to the network and then the Flutter integrations.
     // Flutter Web doesn't need that, only Android and iOS.
-    if (platformChecker.hasNativeIntegration) {
-      integrations.add(NativeSdkIntegration(channel));
+    if (_native != null) {
+      integrations.add(NativeSdkIntegration(_native!));
     }
 
     // Will enrich events with device context, native packages and integrations
     if (platformChecker.hasNativeIntegration &&
         !platformChecker.isWeb &&
-        (platform.isIOS || platform.isMacOS)) {
+        (platform.isIOS || platform.isMacOS || platform.isAndroid)) {
       integrations.add(LoadContextsIntegration(channel));
     }
 
@@ -169,6 +180,10 @@ mixin SentryFlutter {
     final renderer = options.rendererWrapper.getRenderer();
     if (!platformChecker.isWeb || renderer == FlutterRenderer.canvasKit) {
       integrations.add(ScreenshotIntegration());
+    }
+
+    if (platformChecker.isWeb) {
+      integrations.add(ConnectivityIntegration());
     }
 
     // works with Skia, CanvasKit and HTML renderer
@@ -184,13 +199,7 @@ mixin SentryFlutter {
     if (_native != null) {
       integrations.add(NativeAppStartIntegration(
         _native!,
-        () {
-          try {
-            /// Flutter >= 2.12 throws if SchedulerBinding.instance isn't initialized.
-            return SchedulerBinding.instance;
-          } catch (_) {}
-          return null;
-        },
+        DefaultFrameCallbackHandler(),
       ));
     }
     return integrations;
@@ -224,8 +233,15 @@ mixin SentryFlutter {
     options.sdk = sdk;
   }
 
+  /// Reports the time it took for the screen to be fully displayed.
+  /// This requires the [SentryFlutterOptions.enableTimeToFullDisplayTracing] option to be set to `true`.
+  static Future<void> reportFullyDisplayed() async {
+    return SentryNavigatorObserver.timeToDisplayTracker?.reportFullyDisplayed();
+  }
+
   @internal
   static SentryNative? get native => _native;
+
   @internal
   static set native(SentryNative? value) => _native = value;
   static SentryNative? _native;

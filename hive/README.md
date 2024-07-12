@@ -8,9 +8,9 @@
 Sentry integration for `hive` package
 ===========
 
-| package     | build                                                                                                                                                                           | pub                                                                                                  | likes                                                                                                | popularity                                                                                                     | pub points |
-|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------| ------- |
-| sentry_hive | [![build](https://github.com/getsentry/sentry-dart/workflows/sentry-hive/badge.svg?branch=main)](https://github.com/getsentry/sentry-dart/actions?query=workflow%3Asentry-hive) | [![pub package](https://img.shields.io/pub/v/sentry_hive.svg)](https://pub.dev/packages/sentry_hive) | [![likes](https://img.shields.io/pub/likes/sentry_hive)](https://pub.dev/packages/sentry_hive/score) | [![popularity](https://img.shields.io/pub/popularity/sentry_hive)](https://pub.dev/packages/sentry_hive/score) | [![pub points](https://img.shields.io/pub/points/sentry_hive)](https://pub.dev/packages/sentry_hive/score)
+| package     | build                                                                                                                                                                                | pub                                                                                                  | likes                                                                                                | popularity                                                                                                     | pub points |
+|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------| ------- |
+| sentry_hive | [![build](https://github.com/getsentry/sentry-dart/actions/workflows/hive.yml/badge.svg?branch=main)](https://github.com/getsentry/sentry-dart/actions?query=workflow%3Asentry-hive) | [![pub package](https://img.shields.io/pub/v/sentry_hive.svg)](https://pub.dev/packages/sentry_hive) | [![likes](https://img.shields.io/pub/likes/sentry_hive)](https://pub.dev/packages/sentry_hive/score) | [![popularity](https://img.shields.io/pub/popularity/sentry_hive)](https://pub.dev/packages/sentry_hive/score) | [![pub points](https://img.shields.io/pub/points/sentry_hive)](https://pub.dev/packages/sentry_hive/score)
 
 Integration for the [`hive`](https://pub.dev/packages/hive) package.
 
@@ -78,8 +78,9 @@ class Person {
 
 #### Resources
 
-* [![Documentation](https://img.shields.io/badge/documentation-sentry.io-green.svg)](https://docs.sentry.io/platforms/dart/)
-* [![Forum](https://img.shields.io/badge/forum-sentry-green.svg)](https://forum.sentry.io/c/sdks)
-* [![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/Ww9hbqr)
+* [![Flutter docs](https://img.shields.io/badge/documentation-sentry.io-green.svg?label=flutter%20docs)](https://docs.sentry.io/platforms/flutter/)
+* [![Dart docs](https://img.shields.io/badge/documentation-sentry.io-green.svg?label=dart%20docs)](https://docs.sentry.io/platforms/dart/)
+* [![Discussions](https://img.shields.io/github/discussions/getsentry/sentry-dart.svg)](https://github.com/getsentry/sentry-dart/discussions)
+* [![Discord Chat](https://img.shields.io/discord/621778831602221064?logo=discord&logoColor=ffffff&color=7389D8)](https://discord.gg/PXa5Apfe7K)
 * [![Stack Overflow](https://img.shields.io/badge/stack%20overflow-sentry-green.svg)](https://stackoverflow.com/questions/tagged/sentry)
 * [![Twitter Follow](https://img.shields.io/twitter/follow/getsentry?label=getsentry&style=social)](https://twitter.com/intent/follow?screen_name=getsentry)

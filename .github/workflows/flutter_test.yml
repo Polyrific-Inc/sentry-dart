@@ -5,9 +5,12 @@ on:
       - main
       - release/**
   pull_request:
-    paths-ignore:
-      - "**/*.md"
-      - "file/**"
+    paths:
+      - "!**/*.md"
+      - "!**/class-diagram.svg"
+      - ".github/workflows/flutter_test.yml"
+      - "dart/**"
+      - "flutter/**"
 
 env:
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -17,12 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@01ce38bf961b4e243a6342cbade0dbc8ba3f0432 # pin@0.12.0
+        uses: styfle/cancel-workflow-action@85880fa0301c86cca9da44039ee3bb12d3bedbfa # pin@0.12.1
         with:
           access_token: ${{ github.token }}
 
   test-android:
-    runs-on: macos-latest
+    runs-on: macos-13
     timeout-minutes: 30
     defaults:
       run:
@@ -35,12 +38,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           distribution: "adopt"
-          java-version: "11"
+          java-version: "17"
 
-      - uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225 # pin@v2.12.0
+      - uses: subosito/flutter-action@44ac965b96f18d999802d4b807e3256d5a3f9fa1 # pin@v2.16.0
         with:
           channel: ${{ matrix.sdk }}
 
@@ -51,10 +54,10 @@ jobs:
         run: flutter pub get
 
       - name: Gradle cache
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/gradle-build-action@66535aaf56f831b35e3a8481c9c99b665b84dd45 # pin@v3.0.0
 
       - name: AVD cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: avd-cache
         with:
           path: |
@@ -64,7 +67,7 @@ jobs:
 
       - name: create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@d94c3fbe4fe6a29e4a5ba47c12fb47677c73656b #pin@v2.28.0
+        uses: reactivecircus/android-emulator-runner@77986be26589807b8ebab3fde7bbf5c60dabec32 #pin@v2.31.0
         with:
           working-directory: ./flutter/example
           api-level: 31
@@ -81,7 +84,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: launch android emulator & run android native test
-        uses: reactivecircus/android-emulator-runner@d94c3fbe4fe6a29e4a5ba47c12fb47677c73656b #pin@v2.28.0
+        uses: reactivecircus/android-emulator-runner@77986be26589807b8ebab3fde7bbf5c60dabec32 #pin@v2.31.0
         with:
           working-directory: ./flutter/example/android
           api-level: 31
@@ -94,7 +97,7 @@ jobs:
           script: ./gradlew testDebugUnitTest
 
       - name: launch android emulator & run android integration test
-        uses: reactivecircus/android-emulator-runner@d94c3fbe4fe6a29e4a5ba47c12fb47677c73656b #pin@v2.28.0
+        uses: reactivecircus/android-emulator-runner@77986be26589807b8ebab3fde7bbf5c60dabec32 #pin@v2.31.0
         with:
           working-directory: ./flutter/example
           api-level: 31
@@ -108,7 +111,7 @@ jobs:
 
   cocoa:
     name: "${{ matrix.target }} | ${{ matrix.sdk }}"
-    runs-on: macos-13
+    runs-on: macos-latest-xlarge
     timeout-minutes: 30
     defaults:
       run:
@@ -122,7 +125,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225 # pin@v2.12.0
+      - uses: subosito/flutter-action@44ac965b96f18d999802d4b807e3256d5a3f9fa1 # pin@v2.16.0
         with:
           channel: ${{ matrix.sdk }}
 

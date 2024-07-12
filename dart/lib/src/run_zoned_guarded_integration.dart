@@ -44,13 +44,15 @@ class RunZonedGuardedIntegration extends Integration<SentryOptions> {
       stackTrace: stackTrace,
     );
 
-    // runZonedGuarded doesn't crash the App.
-    final mechanism = Mechanism(type: 'runZonedGuarded', handled: true);
+    // runZonedGuarded doesn't crash the app, but is not handled by the user.
+    final mechanism = Mechanism(type: 'runZonedGuarded', handled: false);
     final throwableMechanism = ThrowableMechanism(mechanism, exception);
 
     final event = SentryEvent(
       throwable: throwableMechanism,
-      level: SentryLevel.fatal,
+      level: options.markAutomaticallyCollectedErrorsAsFatal
+          ? SentryLevel.fatal
+          : SentryLevel.error,
       timestamp: hub.options.clock(),
     );
 

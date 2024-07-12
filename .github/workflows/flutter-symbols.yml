@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@b64355ae6ca0b5d484f0106a033dd1388965d06d # pin@v1
+      - uses: dart-lang/setup-dart@0a8a0fc875eb934c15d08629302413c671d3f672 # pin@v1
 
       - run: dart pub get
 
@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@b64355ae6ca0b5d484f0106a033dd1388965d06d # pin@v1
+      - uses: dart-lang/setup-dart@0a8a0fc875eb934c15d08629302413c671d3f672 # pin@v1
 
       - run: dart pub get
 
@@ -51,7 +51,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Upload updated status cache of processed files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: flutter-symbol-collector-database

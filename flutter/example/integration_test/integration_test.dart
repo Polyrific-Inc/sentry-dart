@@ -1,4 +1,5 @@
 // ignore_for_file: avoid_print
+// ignore_for_file: invalid_use_of_internal_member
 
 import 'dart:async';
 import 'dart:convert';
@@ -8,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_flutter_example/main.dart';
 import 'package:http/http.dart';
+import 'package:sentry_flutter/src/integrations/native_app_start_integration.dart';
 
 void main() {
   // const org = 'sentry-sdks';
@@ -24,6 +26,8 @@ void main() {
   // Using fake DSN for testing purposes.
   Future<void> setupSentryAndApp(WidgetTester tester,
       {String? dsn, BeforeSendCallback? beforeSendCallback}) async {
+    NativeAppStartIntegration.isIntegrationTest = true;
+
     await setupSentry(
       () async {
         await tester.pumpWidget(SentryScreenshotWidget(
@@ -199,7 +203,7 @@ void main() {
 class Fixture {
   SentryEvent? sentEvent;
 
-  FutureOr<SentryEvent?> beforeSend(SentryEvent event, {Hint? hint}) async {
+  FutureOr<SentryEvent?> beforeSend(SentryEvent event, Hint hint) async {
     sentEvent = event;
     return event;
   }
