@@ -39,11 +39,18 @@ void main() {
       expect(mock.numberOfInitCalls, 1);
     });
 
-    test('do not throw', () async {
-      final integration = NativeSdkIntegration(_ThrowingMockSentryNative());
+    test('does not throw', () async {
+      fixture.options.automatedTestMode = false;
 
-      await integration(fixture.hub, fixture.options);
+      fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
+      await fixture.registerIntegration();
+      expect(fixture.options.sdk.integrations.contains('nativeSdkIntegration'),
+          false);
+    });
 
+    test('rethrows in tests', () async {
+      fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
+      expect(fixture.registerIntegration, throwsException);
       expect(fixture.options.sdk.integrations.contains('nativeSdkIntegration'),
           false);
     });
@@ -79,19 +86,9 @@ void main() {
       expect(mock.numberOfCloseCalls, 0);
     });
 
-    test('adds integration', () async {
-      final mock = TestMockSentryNative();
-      final integration = NativeSdkIntegration(mock);
-
-      await integration.call(fixture.hub, fixture.options);
-
-      expect(fixture.options.sdk.integrations, ['nativeSdkIntegration']);
-    });
-
-    test(' is not added in case of an exception', () async {
-      final integration = NativeSdkIntegration(_ThrowingMockSentryNative());
-
-      await integration.call(fixture.hub, fixture.options);
+    test('is not added in case of an exception', () async {
+      fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
+      expect(fixture.registerIntegration, throwsException);
       expect(fixture.options.sdk.integrations, <String>[]);
     });
   });
@@ -104,7 +101,7 @@ class Fixture {
 
 class _ThrowingMockSentryNative extends TestMockSentryNative {
   @override
-  Future<void> init(SentryFlutterOptions options) async {
+  Future<void> init(Hub? hub) async {
     throw Exception();
   }
 }

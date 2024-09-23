@@ -124,6 +124,9 @@ class Hub {
           exception: exception,
           stackTrace: stackTrace,
         );
+        if (_options.automatedTestMode) {
+          rethrow;
+        }
       } finally {
         _lastEventId = sentryId;
       }
@@ -183,6 +186,9 @@ class Hub {
           exception: exception,
           stackTrace: stackTrace,
         );
+        if (_options.automatedTestMode) {
+          rethrow;
+        }
       } finally {
         _lastEventId = sentryId;
       }
@@ -238,6 +244,9 @@ class Hub {
           exception: exception,
           stackTrace: stackTrace,
         );
+        if (_options.automatedTestMode) {
+          rethrow;
+        }
       } finally {
         _lastEventId = sentryId;
       }
@@ -271,6 +280,9 @@ class Hub {
         exception: exception,
         stackTrace: stacktrace,
       );
+      if (_options.automatedTestMode) {
+        rethrow;
+      }
     }
   }
 
@@ -364,6 +376,9 @@ class Hub {
           exception: exception,
           stackTrace: stackTrace,
         );
+        if (_options.automatedTestMode) {
+          rethrow;
+        }
       }
 
       _isEnabled = false;
@@ -542,6 +557,11 @@ class Hub {
           DiscardReason.sampleRate,
           DataCategory.transaction,
         );
+        _options.recorder.recordLostEvent(
+          DiscardReason.sampleRate,
+          DataCategory.span,
+          count: transaction.spans.length + 1,
+        );
         _options.logger(
           SentryLevel.warning,
           'Transaction ${transaction.eventId} was dropped due to sampling decision.',
@@ -560,6 +580,9 @@ class Hub {
             exception: exception,
             stackTrace: stackTrace,
           );
+          if (_options.automatedTestMode) {
+            rethrow;
+          }
         }
       }
     }
@@ -597,6 +620,9 @@ class Hub {
           exception: exception,
           stackTrace: stackTrace,
         );
+        if (_options.automatedTestMode) {
+          rethrow;
+        }
       }
     }
     return sentryId;
@@ -677,6 +703,9 @@ class _WeakMap {
         exception: exception,
         stackTrace: stackTrace,
       );
+      if (_options.automatedTestMode) {
+        rethrow;
+      }
     }
   }
 
@@ -694,6 +723,9 @@ class _WeakMap {
         exception: exception,
         stackTrace: stackTrace,
       );
+      if (_options.automatedTestMode) {
+        rethrow;
+      }
     }
     return null;
   }

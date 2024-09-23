@@ -15,9 +15,13 @@ void main() {
   group('$SentryNative', () {
     late Fixture fixture;
 
-    setUp(() {
-      fixture = Fixture();
-    });
+      setUp(() {
+        channel = MockMethodChannel();
+        final options =
+            defaultTestOptions(getPlatformChecker(platform: mockPlatform))
+              ..methodChannel = channel;
+        sut = createBinding(options);
+      });
 
     test('fetchNativeAppStart', () async {
       final map = <String, dynamic>{
@@ -238,7 +242,81 @@ void main() {
 class Fixture {
   final methodChannel = MockMethodChannel();
 
-  SentryNativeChannel getSut() {
-    return SentryNativeChannel(methodChannel);
+      test('captureEnvelope', () async {
+        final data = Uint8List.fromList([1, 2, 3]);
+
+        late Uint8List captured;
+        when(channel.invokeMethod('captureEnvelope', any)).thenAnswer(
+            (invocation) async =>
+                {captured = invocation.positionalArguments[1][0] as Uint8List});
+
+        await sut.captureEnvelope(data, false);
+
+        expect(captured, data);
+      });
+
+      test('loadContexts', () async {
+        when(channel.invokeMethod('loadContexts'))
+            .thenAnswer((invocation) async => {
+                  'foo': [1, 2, 3],
+                  'bar': {'a': 'b'},
+                });
+
+        final data = await sut.loadContexts();
+
+        expect(data, {
+          'foo': [1, 2, 3],
+          'bar': {'a': 'b'},
+        });
+      });
+
+      test('loadDebugImages', () async {
+        final json = [
+          {
+            'code_file': '/apex/com.android.art/javalib/arm64/boot.oat',
+            'code_id': '13577ce71153c228ecf0eb73fc39f45010d487f8',
+            'image_addr': '0x6f80b000',
+            'image_size': 3092480,
+            'type': 'elf',
+            'debug_id': 'e77c5713-5311-28c2-ecf0-eb73fc39f450',
+            'debug_file': 'test'
+          }
+        ];
+
+        when(channel.invokeMethod('loadImageList'))
+            .thenAnswer((invocation) async => json);
+
+        final data = await sut.loadDebugImages();
+
+        expect(data?.map((v) => v.toJson()), json);
+      });
+
+      test('pauseAppHangTracking', () async {
+        when(channel.invokeMethod('pauseAppHangTracking'))
+            .thenAnswer((_) => Future.value());
+
+        await sut.pauseAppHangTracking();
+
+        verify(channel.invokeMethod('pauseAppHangTracking'));
+      });
+
+      test('resumeAppHangTracking', () async {
+        when(channel.invokeMethod('resumeAppHangTracking'))
+            .thenAnswer((_) => Future.value());
+
+        await sut.resumeAppHangTracking();
+
+        verify(channel.invokeMethod('resumeAppHangTracking'));
+      });
+
+      test('nativeCrash', () async {
+        when(channel.invokeMethod('nativeCrash'))
+            .thenAnswer((_) => Future.value());
+
+        await sut.nativeCrash();
+
+        verify(channel.invokeMethod('nativeCrash'));
+      });
+    });
   }
 }

@@ -8,8 +8,7 @@ import 'sentry_native.dart';
 /// Provide typed methods to access native layer.
 @internal
 abstract class SentryNativeBinding {
-  // TODO Move other native calls here.
-  Future<void> init(SentryFlutterOptions options);
+  Future<void> init(Hub hub);
 
   Future<void> close();
 
@@ -43,4 +42,14 @@ abstract class SentryNativeBinding {
 
   Future<Map<String, dynamic>?> collectProfile(
       SentryId traceId, int startTimeNs, int endTimeNs);
+
+  Future<List<DebugImage>?> loadDebugImages();
+
+  Future<void> pauseAppHangTracking();
+
+  Future<void> resumeAppHangTracking();
+
+  Future<void> nativeCrash();
+
+  Future<SentryId> captureReplay(bool isCrash);
 }

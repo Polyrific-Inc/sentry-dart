@@ -18,7 +18,8 @@ void main() {
     void _mockValues() {
       when(fixture.hub.configureScope(captureAny)).thenAnswer((_) {});
 
-      when(fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')))
+      when(fixture.hub.captureEvent(captureAny,
+              hint: anyNamed('hint'), stackTrace: anyNamed('stackTrace')))
           .thenAnswer((_) => Future.value(SentryId.empty()));
 
       when(fixture.hub.options).thenReturn(fixture.options);
@@ -63,7 +64,11 @@ void main() {
       _reportError(exception: exception);
 
       final event = verify(
-        await fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')),
+        await fixture.hub.captureEvent(
+          captureAny,
+          hint: anyNamed('hint'),
+          stackTrace: anyNamed('stackTrace'),
+        ),
       ).captured.first as SentryEvent;
 
       expect(event.level, SentryLevel.fatal);
@@ -77,6 +82,10 @@ void main() {
       expect(event.contexts['flutter_error_details']['context'],
           'thrown while handling a gesture');
       expect(event.contexts['flutter_error_details']['information'], 'foo bar');
+    }, onPlatform: {
+      // TODO stacktrace parsing for wasm is not implemented yet
+      //      https://github.com/getsentry/sentry-dart/issues/1480
+      'wasm': Skip('WASM stack trace parsing not implemented yet'),
     });
 
     test('captures error with long FlutterErrorDetails.information', () async {
@@ -95,7 +104,8 @@ void main() {
       _reportError(exception: StateError('error'), optionalDetails: details);
 
       final event = verify(
-        await fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')),
+        await fixture.hub.captureEvent(captureAny,
+            hint: anyNamed('hint'), stackTrace: anyNamed('stackTrace')),
       ).captured.first as SentryEvent;
 
       expect(event.level, SentryLevel.fatal);
@@ -109,6 +119,10 @@ void main() {
           'thrown while handling a gesture');
       expect(event.contexts['flutter_error_details']['information'],
           'foo bar\nHello World!');
+    }, onPlatform: {
+      // TODO stacktrace parsing for wasm is not implemented yet
+      //      https://github.com/getsentry/sentry-dart/issues/1480
+      'wasm': Skip('WASM stack trace parsing not implemented yet'),
     });
 
     test('captures error with no FlutterErrorDetails', () async {
@@ -119,7 +133,8 @@ void main() {
       _reportError(exception: StateError('error'), optionalDetails: details);
 
       final event = verify(
-        await fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')),
+        await fixture.hub.captureEvent(captureAny,
+            hint: anyNamed('hint'), stackTrace: anyNamed('stackTrace')),
       ).captured.first as SentryEvent;
 
       expect(event.level, SentryLevel.fatal);
@@ -141,7 +156,9 @@ void main() {
       _reportError(handler: defaultError);
 
       verify(
-          await fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')));
+        await fixture.hub.captureEvent(captureAny,
+            hint: anyNamed('hint'), stackTrace: anyNamed('stackTrace')),
+      );
 
       expect(called, true);
     });
@@ -166,8 +183,10 @@ void main() {
 
       FlutterError.reportError(details);
 
-      verify(await fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')))
-          .called(1);
+      verify(
+        await fixture.hub.captureEvent(captureAny,
+            hint: anyNamed('hint'), stackTrace: anyNamed('stackTrace')),
+      ).called(1);
 
       expect(numberOfDefaultCalls, 1);
     });
@@ -200,6 +219,26 @@ void main() {
       expect(FlutterError.onError, afterIntegrationOnError);
     });
 
+    test('captureEvent never uses an empty or null stack trace', () async {
+      final exception = StateError('error');
+      final details = FlutterErrorDetails(
+        exception: exception,
+        stack: null, // Explicitly set stack to null
+      );
+
+      _reportError(optionalDetails: details);
+
+      final captured = verify(
+        await fixture.hub.captureEvent(captureAny,
+            hint: anyNamed('hint'), stackTrace: captureAnyNamed('stackTrace')),
+      ).captured;
+
+      final stackTrace = captured[1] as StackTrace?;
+
+      expect(stackTrace, isNotNull);
+      expect(stackTrace.toString(), isNotEmpty);
+    });
+
     test('do not capture if silent error', () async {
       _reportError(silent: true);
 
@@ -211,7 +250,9 @@ void main() {
       _reportError(silent: true);
 
       verify(
-          await fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')));
+        await fixture.hub.captureEvent(captureAny,
+            hint: anyNamed('hint'), stackTrace: anyNamed('stackTrace')),
+      );
     });
 
     test('adds integration', () {
@@ -228,6 +269,14 @@ void main() {
 
       final hub = Hub(fixture.options);
       final client = MockSentryClient();
+      when(client.captureEvent(any,
+              scope: anyNamed('scope'),
+              stackTrace: anyNamed('stackTrace'),
+              hint: anyNamed('hint')))
+          .thenAnswer((_) => Future.value(SentryId.newId()));
+      when(client.captureTransaction(any,
+              scope: anyNamed('scope'), traceContext: anyNamed('traceContext')))
+          .thenAnswer((_) => Future.value(SentryId.newId()));
       hub.bindClient(client);
 
       final sut = fixture.getSut();
@@ -255,7 +304,8 @@ void main() {
       _reportError(exception: exception);
 
       final event = verify(
-        await fixture.hub.captureEvent(captureAny, hint: anyNamed('hint')),
+        await fixture.hub.captureEvent(captureAny,
+            hint: anyNamed('hint'), stackTrace: anyNamed('stackTrace')),
       ).captured.first as SentryEvent;
 
       expect(event.level, SentryLevel.error);
@@ -265,7 +315,7 @@ void main() {
 
 class Fixture {
   final hub = MockHub();
-  final options = SentryFlutterOptions(dsn: fakeDsn)..tracesSampleRate = 1.0;
+  final options = defaultTestOptions()..tracesSampleRate = 1.0;
 
   FlutterErrorIntegration getSut() {
     return FlutterErrorIntegration();

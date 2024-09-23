@@ -24,6 +24,7 @@ import 'mocks/mock_hub.dart';
 import 'mocks/mock_platform.dart';
 import 'mocks/mock_platform_checker.dart';
 import 'mocks/mock_transport.dart';
+import 'test_utils.dart';
 
 void main() {
   group('SentryClient captures message', () {
@@ -809,7 +810,9 @@ void main() {
         ..fingerprint = fingerprint
         ..addBreadcrumb(crumb)
         ..setTag(scopeTagKey, scopeTagValue)
-        ..setExtra(scopeExtraKey, scopeExtraValue);
+        // ignore: deprecated_member_use_from_same_package
+        ..setExtra(scopeExtraKey, scopeExtraValue)
+        ..replayId = SentryId.fromId('1');
 
       scope.setUser(user);
     });
@@ -835,6 +838,8 @@ void main() {
         scopeExtraKey: scopeExtraValue,
         eventExtraKey: eventExtraValue,
       });
+      expect(
+          capturedEnvelope.header.traceContext?.replayId, SentryId.fromId('1'));
     });
   });
 
@@ -1029,6 +1034,166 @@ void main() {
     });
   });
 
+  group('SentryClient ignored errors', () {
+    late Fixture fixture;
+
+    setUp(() {
+      fixture = Fixture();
+      fixture.options.ignoreErrors = ["my-error", "^error-.*\$"];
+    });
+
+    test('drop event if error message fully matches ignoreErrors value',
+        () async {
+      final event = SentryEvent(message: SentryMessage("my-error"));
+
+      final client = fixture.getSut();
+      await client.captureEvent(event);
+
+      expect((fixture.transport).called(0), true);
+    });
+
+    test('drop event if error message partially matches ignoreErrors value',
+        () async {
+      final event = SentryEvent(message: SentryMessage("this is my-error-foo"));
+
+      final client = fixture.getSut();
+      await client.captureEvent(event);
+
+      expect((fixture.transport).called(0), true);
+    });
+
+    test(
+        'drop event if error message partially matches ignoreErrors regex value',
+        () async {
+      final event = SentryEvent(message: SentryMessage("error-test message"));
+
+      final client = fixture.getSut();
+      await client.captureEvent(event);
+
+      expect((fixture.transport).called(0), true);
+    });
+
+    test('send event if error message does not match ignoreErrors value',
+        () async {
+      final event = SentryEvent(message: SentryMessage("warning"));
+
+      final client = fixture.getSut();
+      await client.captureEvent(event);
+
+      expect((fixture.transport).called(1), true);
+    });
+
+    test('send event if no values are set for ignoreErrors', () async {
+      fixture.options.ignoreErrors = [];
+      final event = SentryEvent(message: SentryMessage("this is a test event"));
+
+      final client = fixture.getSut();
+      await client.captureEvent(event);
+
+      expect((fixture.transport).called(1), true);
+    });
+  });
+
+  group('SentryClient ignored transactions', () {
+    late Fixture fixture;
+
+    setUp(() {
+      fixture = Fixture();
+      fixture.options.ignoreTransactions = [
+        "my-transaction",
+        "^transaction-.*\$"
+      ];
+    });
+
+    test('drop transaction if name fully matches ignoreTransaction value',
+        () async {
+      final client = fixture.getSut();
+      final fakeTransaction = fixture.fakeTransaction();
+      fakeTransaction.tracer.name = "my-transaction";
+      await client.captureTransaction(fakeTransaction);
+
+      expect((fixture.transport).called(0), true);
+    });
+
+    test('drop transaction if name partially matches ignoreTransaction value',
+        () async {
+      final client = fixture.getSut();
+      final fakeTransaction = fixture.fakeTransaction();
+      fakeTransaction.tracer.name = "this is a transaction-test";
+      await client.captureTransaction(fakeTransaction);
+
+      expect((fixture.transport).called(0), true);
+    });
+
+    test(
+        'drop transaction if name partially matches ignoreTransaction regex value',
+        () async {
+      final client = fixture.getSut();
+      final fakeTransaction = fixture.fakeTransaction();
+      fakeTransaction.tracer.name = "transaction-test message";
+      await client.captureTransaction(fakeTransaction);
+
+      expect((fixture.transport).called(0), true);
+    });
+
+    test('send transaction if name does not match ignoreTransaction value',
+        () async {
+      final client = fixture.getSut();
+      final fakeTransaction = fixture.fakeTransaction();
+      fakeTransaction.tracer.name = "capture";
+      await client.captureTransaction(fakeTransaction);
+
+      expect((fixture.transport).called(1), true);
+    });
+
+    test('send transaction if no values are set for ignoreTransaction',
+        () async {
+      fixture.options.ignoreTransactions = [];
+      final client = fixture.getSut();
+      final fakeTransaction = fixture.fakeTransaction();
+      fakeTransaction.tracer.name = "this is a test transaction";
+      await client.captureTransaction(fakeTransaction);
+
+      expect((fixture.transport).called(1), true);
+    });
+  });
+
+  group('SentryClient ignored exceptions', () {
+    late Fixture fixture;
+
+    setUp(() {
+      fixture = Fixture();
+    });
+
+    test('addExceptionFilterForType drops matching error event throwable',
+        () async {
+      fixture.options.addExceptionFilterForType(ExceptionWithCause);
+
+      final throwable = ExceptionWithCause(Error(), StackTrace.current);
+      final event = SentryEvent(throwable: throwable);
+
+      final client = fixture.getSut();
+      await client.captureEvent(event);
+
+      expect((fixture.transport).called(0), true);
+    });
+
+    test('record ignored exceptions dropping event', () async {
+      fixture.options.addExceptionFilterForType(ExceptionWithCause);
+
+      final throwable = ExceptionWithCause(Error(), StackTrace.current);
+      final event = SentryEvent(throwable: throwable);
+
+      final client = fixture.getSut();
+      await client.captureEvent(event);
+
+      expect(fixture.recorder.discardedEvents.first.reason,
+          DiscardReason.eventProcessor);
+      expect(
+          fixture.recorder.discardedEvents.first.category, DataCategory.error);
+    });
+  });
+
   group('SentryClient before send transaction', () {
     late Fixture fixture;
 
@@ -1082,11 +1247,13 @@ void main() {
     });
 
     test('thrown error is handled', () async {
+      fixture.options.automatedTestMode = false;
       final exception = Exception("before send exception");
       final beforeSendTransactionCallback = (SentryTransaction event) {
         throw exception;
       };
 
+      fixture.options.automatedTestMode = false;
       final client = fixture.getSut(
           beforeSendTransaction: beforeSendTransactionCallback, debug: true);
       final fakeTransaction = fixture.fakeTransaction();
@@ -1144,11 +1311,13 @@ void main() {
     });
 
     test('thrown error is handled', () async {
+      fixture.options.automatedTestMode = false;
       final exception = Exception("before send exception");
       final beforeSendCallback = (SentryEvent event, Hint hint) {
         throw exception;
       };
 
+      fixture.options.automatedTestMode = false;
       final client =
           fixture.getSut(beforeSend: beforeSendCallback, debug: true);
 
@@ -1321,6 +1490,7 @@ void main() {
       final client = fixture.getSut();
 
       final scope = Scope(fixture.options);
+      scope.replayId = SentryId.newId();
       scope.span =
           SentrySpan(fixture.tracer, fixture.tracer.context, MockHub());
 
@@ -1328,6 +1498,7 @@ void main() {
 
       final envelope = fixture.transport.envelopes.first;
       expect(envelope.header.traceContext, isNotNull);
+      expect(envelope.header.traceContext?.replayId, scope.replayId);
     });
 
     test('captureEvent adds attachments from hint', () async {
@@ -1384,12 +1555,14 @@ void main() {
       final context = SentryTraceContextHeader.fromJson(<String, dynamic>{
         'trace_id': '${tr.eventId}',
         'public_key': '123',
+        'replay_id': '456',
       });
 
       await client.captureTransaction(tr, traceContext: context);
 
       final envelope = fixture.transport.envelopes.first;
       expect(envelope.header.traceContext, isNotNull);
+      expect(envelope.header.traceContext?.replayId, SentryId.fromId('456'));
     });
 
     test('captureUserFeedback calls flush', () async {
@@ -1433,12 +1606,119 @@ void main() {
     });
 
     test('record event processor dropping event', () async {
-      final client = fixture.getSut(eventProcessor: DropAllEventProcessor());
+      bool secondProcessorCalled = false;
+      fixture.options.addEventProcessor(DropAllEventProcessor());
+      fixture.options.addEventProcessor(FunctionEventProcessor((event, hint) {
+        secondProcessorCalled = true;
+        return event;
+      }));
+      final client = fixture.getSut();
 
       await client.captureEvent(fakeEvent);
 
-      expect(fixture.recorder.reason, DiscardReason.eventProcessor);
-      expect(fixture.recorder.category, DataCategory.error);
+      expect(fixture.recorder.discardedEvents.first.reason,
+          DiscardReason.eventProcessor);
+      expect(
+          fixture.recorder.discardedEvents.first.category, DataCategory.error);
+      expect(secondProcessorCalled, isFalse);
+    });
+
+    test('record event processor dropping transaction', () async {
+      final sut = fixture.getSut(eventProcessor: DropAllEventProcessor());
+      final transaction = SentryTransaction(fixture.tracer);
+      fixture.tracer.startChild('child1');
+      fixture.tracer.startChild('child2');
+      fixture.tracer.startChild('child3');
+
+      await sut.captureTransaction(transaction);
+
+      expect(fixture.recorder.discardedEvents.length, 2);
+
+      final spanCount = fixture.recorder.discardedEvents
+          .firstWhere((element) =>
+              element.category == DataCategory.span &&
+              element.reason == DiscardReason.eventProcessor)
+          .quantity;
+      expect(spanCount, 4);
+    });
+
+    test('record event processor dropping partially spans', () async {
+      final numberOfSpansDropped = 2;
+      final sut = fixture.getSut(
+          eventProcessor: DropSpansEventProcessor(numberOfSpansDropped));
+      final transaction = SentryTransaction(fixture.tracer);
+      fixture.tracer.startChild('child1');
+      fixture.tracer.startChild('child2');
+      fixture.tracer.startChild('child3');
+
+      await sut.captureTransaction(transaction);
+
+      expect(fixture.recorder.discardedEvents.length, 1);
+
+      final spanCount = fixture.recorder.discardedEvents
+          .firstWhere((element) =>
+              element.category == DataCategory.span &&
+              element.reason == DiscardReason.eventProcessor)
+          .quantity;
+      expect(spanCount, numberOfSpansDropped);
+    });
+
+    test('beforeSendTransaction correctly records partially dropped spans',
+        () async {
+      final sut = fixture.getSut();
+      final transaction = SentryTransaction(fixture.tracer);
+      fixture.tracer.startChild('child1');
+      fixture.tracer.startChild('child2');
+      fixture.tracer.startChild('child3');
+
+      fixture.options.beforeSendTransaction = (transaction) {
+        if (transaction.tracer == fixture.tracer) {
+          return null;
+        }
+        return transaction;
+      };
+
+      await sut.captureTransaction(transaction);
+
+      expect(fixture.recorder.discardedEvents.length, 2);
+
+      final spanCount = fixture.recorder.discardedEvents
+          .firstWhere((element) =>
+              element.category == DataCategory.span &&
+              element.reason == DiscardReason.beforeSend)
+          .quantity;
+      expect(spanCount, 4);
+    });
+
+    test('beforeSendTransaction correctly records partially dropped spans',
+        () async {
+      final sut = fixture.getSut();
+      final transaction = SentryTransaction(fixture.tracer);
+      fixture.tracer.startChild('child1');
+      fixture.tracer.startChild('child2');
+      fixture.tracer.startChild('child3');
+
+      fixture.options.beforeSendTransaction = (transaction) {
+        if (transaction.tracer == fixture.tracer) {
+          transaction.spans
+              .removeWhere((element) => element.context.operation == 'child2');
+          return transaction;
+        }
+        return transaction;
+      };
+
+      await sut.captureTransaction(transaction);
+
+      // we didn't drop the whole transaction, we only have 1 event for the dropped spans
+      expect(fixture.recorder.discardedEvents.length, 1);
+
+      // tracer has 3 span children and we dropped 1 of them
+      final spanCount = fixture.recorder.discardedEvents
+          .firstWhere((element) =>
+              element.category == DataCategory.span &&
+              element.reason == DiscardReason.beforeSend)
+          .quantity;
+      expect(spanCount, 1);
     });
 
     test('record event processor dropping transaction', () async {
@@ -1450,8 +1730,10 @@ void main() {
 
       await client.captureTransaction(transaction);
 
-      expect(fixture.recorder.reason, DiscardReason.eventProcessor);
-      expect(fixture.recorder.category, DataCategory.transaction);
+      expect(fixture.recorder.discardedEvents.first.reason,
+          DiscardReason.eventProcessor);
+      expect(fixture.recorder.discardedEvents.first.category,
+          DataCategory.transaction);
     });
 
     test('record beforeSend dropping event', () async {
@@ -1461,8 +1743,10 @@ void main() {
 
       await client.captureEvent(fakeEvent);
 
-      expect(fixture.recorder.reason, DiscardReason.beforeSend);
-      expect(fixture.recorder.category, DataCategory.error);
+      expect(fixture.recorder.discardedEvents.first.reason,
+          DiscardReason.beforeSend);
+      expect(
+          fixture.recorder.discardedEvents.first.category, DataCategory.error);
     });
 
     test('record sample rate dropping event', () async {
@@ -1472,8 +1756,10 @@ void main() {
 
       await client.captureEvent(fakeEvent);
 
-      expect(fixture.recorder.reason, DiscardReason.sampleRate);
-      expect(fixture.recorder.category, DataCategory.error);
+      expect(fixture.recorder.discardedEvents.first.reason,
+          DiscardReason.sampleRate);
+      expect(
+          fixture.recorder.discardedEvents.first.category, DataCategory.error);
     });
 
     test('user feedback envelope contains dsn', () async {
@@ -1607,8 +1893,8 @@ class Fixture {
   final recorder = MockClientReportRecorder();
   final transport = MockTransport();
 
-  final options = SentryOptions(dsn: fakeDsn)
-    ..platformChecker = MockPlatformChecker(platform: MockPlatform.iOS());
+  final options =
+      defaultTestOptions(MockPlatformChecker(platform: MockPlatform.iOS()));
 
   late SentryTransactionContext _context;
   late SentryTracer tracer;

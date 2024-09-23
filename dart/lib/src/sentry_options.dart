@@ -1,17 +1,17 @@
 import 'dart:async';
 import 'dart:developer';
 
-import 'package:meta/meta.dart';
 import 'package:http/http.dart';
+import 'package:meta/meta.dart';
 
 import '../sentry.dart';
 import 'client_reports/client_report_recorder.dart';
 import 'client_reports/noop_client_report_recorder.dart';
-import 'sentry_exception_factory.dart';
-import 'sentry_stack_trace_factory.dart';
 import 'diagnostic_logger.dart';
 import 'environment/environment_variables.dart';
 import 'noop_client.dart';
+import 'sentry_exception_factory.dart';
+import 'sentry_stack_trace_factory.dart';
 import 'transport/noop_transport.dart';
 import 'version.dart';
 
@@ -184,6 +184,16 @@ class SentryOptions {
   /// sent. Events are picked randomly. Default is null (disabled)
   double? sampleRate;
 
+  /// The ignoreErrors tells the SDK which errors should be not sent to the sentry server.
+  /// If an null or an empty list is used, the SDK will send all transactions.
+  /// To use regex add the `^` and the `$` to the string.
+  List<String> ignoreErrors = [];
+
+  /// The ignoreTransactions tells the SDK which transactions should be not sent to the sentry server.
+  /// If null or an empty list is used, the SDK will send all transactions.
+  /// To use regex add the `^` and the `$` to the string.
+  List<String> ignoreTransactions = [];
+
   final List<String> _inAppExcludes = [];
 
   /// A list of string prefixes of packages names that do not belong to the app, but rather third-party
@@ -334,6 +344,32 @@ class SentryOptions {
     _scopeObservers.add(scopeObserver);
   }
 
+  final List<Type> _ignoredExceptionsForType = [];
+
+  /// Ignored exception types.
+  List<Type> get ignoredExceptionsForType => _ignoredExceptionsForType;
+
+  /// Adds exception type to the list of ignored exceptions.
+  void addExceptionFilterForType(Type exceptionType) {
+    _ignoredExceptionsForType.add(exceptionType);
+  }
+
+  /// Check if [ignoredExceptionsForType] contains an exception.
+  bool containsIgnoredExceptionForType(dynamic exception) {
+    return exception != null &&
+        _ignoredExceptionsForType.contains(exception.runtimeType);
+  }
+
+  /// Enables Dart symbolication for stack traces in Flutter.
+  ///
+  /// If true, the SDK will attempt to symbolicate Dart stack traces when
+  /// [Sentry.init] is used instead of `SentryFlutter.init`. This is useful
+  /// when native debug images are not available.
+  ///
+  /// Automatically set to `false` when using `SentryFlutter.init`, as it uses
+  /// native SDKs for setting up symbolication on iOS, macOS, and Android.
+  bool enableDartSymbolication = true;
+
   @internal
   late ClientReportRecorder recorder = NoOpClientReportRecorder();
 
@@ -382,6 +418,8 @@ class SentryOptions {
   /// Enables generation of transactions and propagation of trace data. If set
   /// to null, tracing might be enabled if [tracesSampleRate] or [tracesSampler]
   /// are set.
+  @Deprecated(
+      'Use either tracesSampleRate or tracesSampler instead. This will be removed in v9')
   bool? enableTracing;
 
   /// Enables sending developer metrics to Sentry.
@@ -436,12 +474,52 @@ class SentryOptions {
   /// Settings this to `false` will set the `level` to [SentryLevel.error].
   bool markAutomaticallyCollectedErrorsAsFatal = true;
 
+  /// Enables identification of exception types in obfuscated builds.
+  /// When true, the SDK will attempt to identify common exception types
+  /// to improve readability of obfuscated issue titles.
+  ///
+  /// If you already have events with obfuscated issue titles this will change grouping.
+  ///
+  /// Default: `true`
+  bool enableExceptionTypeIdentification = true;
+
+  final List<ExceptionTypeIdentifier> _exceptionTypeIdentifiers = [];
+
+  List<ExceptionTypeIdentifier> get exceptionTypeIdentifiers =>
+      List.unmodifiable(_exceptionTypeIdentifiers);
+
+  void addExceptionTypeIdentifierByIndex(
+      int index, ExceptionTypeIdentifier exceptionTypeIdentifier) {
+    _exceptionTypeIdentifiers.insert(
+        index, exceptionTypeIdentifier.withCache());
+  }
+
+  /// Adds an exception type identifier to the beginning of the list.
+  /// This ensures it is processed first and takes precedence over existing identifiers.
+  void prependExceptionTypeIdentifier(
+      ExceptionTypeIdentifier exceptionTypeIdentifier) {
+    addExceptionTypeIdentifierByIndex(0, exceptionTypeIdentifier);
+  }
+
   /// The Spotlight configuration.
   /// Disabled by default.
   /// ```dart
   /// spotlight = Spotlight(enabled: true)
   /// ```
   Spotlight spotlight = Spotlight(enabled: false);
+
+  /// Configure a proxy to use for SDK API calls.
+  ///
+  /// On io platforms without native SDKs (dart, linux, windows), this will use
+  /// an 'IOClient' with inner 'HTTPClient' for http communication.
+  /// A http proxy will be set in returned for 'HttpClient.findProxy' in the
+  /// form 'PROXY <your_host>:<your_port>'.
+  /// When setting 'user' and 'pass', the 'HttpClient.addProxyCredentials'
+  /// method will be called with empty 'realm'.
+  ///
+  /// On Android & iOS, the proxy settings are handled by the native SDK.
+  /// iOS only supports http proxies, while macOS also supports socks.
+  SentryProxy? proxy;
 
   SentryOptions({this.dsn, PlatformChecker? checker}) {
     if (checker != null) {
@@ -494,6 +572,7 @@ class SentryOptions {
   /// Returns if tracing should be enabled. If tracing is disabled, starting transactions returns
   /// [NoOpSentrySpan].
   bool isTracingEnabled() {
+    // ignore: deprecated_member_use_from_same_package
     final enable = enableTracing;
     if (enable != null) {
       return enable;

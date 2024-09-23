@@ -39,6 +39,7 @@ export 'src/sentry_baggage.dart';
 export 'src/exception_cause_extractor.dart';
 export 'src/exception_cause.dart';
 export 'src/exception_stacktrace_extractor.dart';
+export 'src/exception_type_identifier.dart';
 // URL
 // ignore: invalid_export_of_internal_element
 export 'src/utils/http_sanitizer.dart';
@@ -54,3 +55,5 @@ export 'src/sentry_span_operations.dart';
 export 'src/utils.dart';
 // spotlight debugging
 export 'src/spotlight.dart';
+// proxy
+export 'src/protocol/sentry_proxy.dart';

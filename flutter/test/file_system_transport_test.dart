@@ -48,11 +48,9 @@ void main() {
     expect(sentryId, sentryId);
   });
 
-  test('FileSystemTransport returns emptyId if channel throws', () async {
-    // ignore: deprecated_member_use
-    _channel.setMockMethodCallHandler((MethodCall methodCall) async {
-      throw Exception();
-    });
+  test('$FileSystemTransport returns emptyId if channel throws', () async {
+    fixture.options.automatedTestMode = false;
+    when(fixture.binding.captureEnvelope(any, false)).thenThrow(Exception());
 
     final transport = fixture.getSut(_channel);
     final event = SentryEvent();
@@ -119,7 +117,8 @@ void main() {
 }
 
 class Fixture {
-  final options = SentryOptions(dsn: fakeDsn);
+  final options = defaultTestOptions();
+  final binding = MockSentryNativeBinding();
 
   FileSystemTransport getSut(MethodChannel channel) {
     return FileSystemTransport(channel, options);
