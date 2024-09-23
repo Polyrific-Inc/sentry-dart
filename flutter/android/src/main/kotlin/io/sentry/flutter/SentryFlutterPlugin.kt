@@ -230,29 +230,6 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
   }
 
-  private fun displayRefreshRate(result: Result) {
-    var refreshRate: Int? = null
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      val display = activity?.get()?.display
-      if (display != null) {
-        refreshRate = display.refreshRate.toInt()
-      }
-    } else {
-      val display =
-        activity
-          ?.get()
-          ?.window
-          ?.windowManager
-          ?.defaultDisplay
-      if (display != null) {
-        refreshRate = display.refreshRate.toInt()
-      }
-    }
-
-    result.success(refreshRate)
-  }
-
   private fun TimeSpan.addToMap(map: MutableMap<String, Any?>) {
     if (startTimestamp == null) return
 

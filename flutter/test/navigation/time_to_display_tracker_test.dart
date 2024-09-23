@@ -185,6 +185,7 @@ void main() {
     test('does not create ttfd span when not enabled', () async {
       fixture.options.enableTimeToFullDisplayTracing = false;
 
+      SentryFlutter.native = TestMockSentryNative();
       final sut = fixture.getSut();
 
       final transaction = fixture.getTransaction() as SentryTracer;

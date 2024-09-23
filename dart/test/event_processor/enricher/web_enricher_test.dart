@@ -1,10 +1,10 @@
 @TestOn('browser')
 library dart_test;
 
+import 'dart:html' as html;
+
 import 'package:sentry/sentry.dart';
-import 'package:sentry/src/event_processor/enricher/html_enricher_event_processor.dart'
-    if (dart.library.html) 'package:sentry/src/event_processor/enricher/html_enricher_event_processor.dart'
-    if (dart.library.js_interop) 'package:sentry/src/event_processor/enricher/web_enricher_event_processor.dart';
+import 'package:sentry/src/event_processor/enricher/web_enricher_event_processor.dart';
 import 'package:test/test.dart';
 
 import '../../mocks.dart';
@@ -194,8 +194,10 @@ void main() {
       );
       await Sentry.close();
 
-      expect(sentryOptions.eventProcessors.map((e) => e.runtimeType.toString()),
-          contains('$WebEnricherEventProcessor'));
+      final ioEnricherCount = sentryOptions.eventProcessors
+          .whereType<WebEnricherEventProcessor>()
+          .length;
+      expect(ioEnricherCount, 1);
     });
   });
 }

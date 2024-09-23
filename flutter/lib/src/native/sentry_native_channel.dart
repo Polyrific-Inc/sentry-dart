@@ -1,26 +1,17 @@
 import 'dart:async';
-// backcompatibility for Flutter < 3.3
-// ignore: unnecessary_import
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 
 import '../../sentry_flutter.dart';
-import 'native_app_start.dart';
-import 'native_frames.dart';
+import 'sentry_native.dart';
 import 'method_channel_helper.dart';
 import 'sentry_native_binding.dart';
-import 'sentry_native_invoker.dart';
-import 'sentry_safe_method_channel.dart';
 
 /// Provide typed methods to access native layer via MethodChannel.
 @internal
-class SentryNativeChannel
-    with SentryNativeSafeInvoker
-    implements SentryNativeBinding {
-  @override
-  final SentryFlutterOptions options;
+class SentryNativeChannel implements SentryNativeBinding {
+  SentryNativeChannel(this._channel);
 
   @protected
   final SentrySafeMethodChannel channel;

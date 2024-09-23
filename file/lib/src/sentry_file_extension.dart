@@ -1,8 +1,6 @@
 // ignore_for_file: invalid_use_of_internal_member
 
-import 'dart:io'
-    if (dart.library.html) 'dart:html'
-    if (dart.library.js_interop) 'dart:js_interop';
+import 'dart:io' if (dart.library.html) 'dart:html';
 
 import 'package:meta/meta.dart';
 import 'package:sentry/sentry.dart';

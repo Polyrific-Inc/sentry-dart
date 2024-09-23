@@ -8,16 +8,16 @@ import 'package:sentry/src/sentry_envelope_item_header.dart';
 import 'package:sentry/src/sentry_item_type.dart';
 
 import '../sentry_flutter.dart';
-import 'native/sentry_native_binding.dart';
+import 'native/sentry_native.dart';
 
 // ignore: invalid_use_of_internal_member
 class SentryNativeProfilerFactory implements SentryProfilerFactory {
-  final SentryNativeBinding _native;
+  final SentryNative _native;
   final ClockProvider _clock;
 
   SentryNativeProfilerFactory(this._native, this._clock);
 
-  static void attachTo(Hub hub, SentryNativeBinding native) {
+  static void attachTo(Hub hub, SentryNative native) {
     // ignore: invalid_use_of_internal_member
     final options = hub.options;
 
@@ -53,7 +53,7 @@ class SentryNativeProfilerFactory implements SentryProfilerFactory {
 
 // ignore: invalid_use_of_internal_member
 class SentryNativeProfiler implements SentryProfiler {
-  final SentryNativeBinding _native;
+  final SentryNative _native;
   final int _starTimeNs;
   final SentryId _traceId;
   bool _finished = false;

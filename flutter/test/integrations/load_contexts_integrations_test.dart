@@ -1,8 +1,8 @@
 @TestOn('vm')
 library flutter_test;
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_flutter/src/integrations/load_contexts_integration.dart';
 
@@ -85,7 +85,7 @@ void main() {
 
     final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
-    verify(fixture.binding.loadContexts()).called(1);
+    expect(fixture.called, true);
     expect(event?.contexts.device?.name, 'Device1');
     expect(event?.contexts.app?.name, 'test-app');
     expect(event?.contexts.app?.inForeground, true);
@@ -125,7 +125,7 @@ void main() {
 
     final event = await fixture.options.eventProcessors.first.apply(e, Hint());
 
-    verify(fixture.binding.loadContexts()).called(1);
+    expect(fixture.called, true);
     expect(event?.contexts.device?.name, 'eDevice');
     expect(event?.contexts.app?.name, 'eApp');
     expect(event?.contexts.app?.inForeground, true);
@@ -237,7 +237,10 @@ void main() {
   );
 
   test('should not throw on loadContextsIntegration exception', () async {
-    when(fixture.binding.loadContexts()).thenThrow(Exception());
+    // ignore: deprecated_member_use
+    fixture.channel.setMockMethodCallHandler((MethodCall methodCall) async {
+      throw Exception();
+    });
     final integration = fixture.getSut();
     integration(fixture.hub, fixture.options);
 
@@ -424,9 +427,13 @@ void main() {
 }
 
 class Fixture {
+  final channel = MethodChannel('sentry_flutter');
+
   final hub = MockHub();
   final options = defaultTestOptions();
   final binding = MockSentryNativeBinding();
+
+  var called = false;
 
   LoadContextsIntegration getSut(
       {Map<String, dynamic> contexts = const {
@@ -461,7 +468,12 @@ class Fixture {
           }
         ]
       }}) {
-    when(binding.loadContexts()).thenAnswer((_) async => contexts);
-    return LoadContextsIntegration(binding);
+    // ignore: deprecated_member_use
+    channel.setMockMethodCallHandler((MethodCall methodCall) async {
+      called = true;
+      return contexts;
+    });
+
+    return LoadContextsIntegration(channel);
   }
 }

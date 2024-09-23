@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:web/web.dart';
+import 'dart:html';
 
 import 'package:sentry/sentry.dart';
 import 'package:sentry/src/version.dart';
@@ -24,7 +24,7 @@ Future<void> main() async {
 Future<void> runApp() async {
   print('runApp');
 
-  document.querySelector('#output')?.text = 'Your Dart app is running.';
+  querySelector('#output')?.text = 'Your Dart app is running.';
 
   await Sentry.addBreadcrumb(
     Breadcrumb(
@@ -58,20 +58,12 @@ Future<void> runApp() async {
     );
   });
 
-  document
-      .querySelector('#btEvent')
+  querySelector('#btEvent')
       ?.onClick
       .listen((event) => captureCompleteExampleEvent());
-  document
-      .querySelector('#btMessage')
-      ?.onClick
-      .listen((event) => captureMessage());
-  document
-      .querySelector('#btException')
-      ?.onClick
-      .listen((event) => captureException());
-  document
-      .querySelector('#btUnhandledException')
+  querySelector('#btMessage')?.onClick.listen((event) => captureMessage());
+  querySelector('#btException')?.onClick.listen((event) => captureException());
+  querySelector('#btUnhandledException')
       ?.onClick
       .listen((event) => captureUnhandledException());
 }
@@ -85,8 +77,7 @@ Future<void> captureMessage() async {
   );
   print('capture message result : $sentryId');
   if (sentryId != SentryId.empty()) {
-    (document.querySelector('#messageResult') as HTMLElement?)?.style.display =
-        'block';
+    querySelector('#messageResult')?.style.display = 'block';
   }
 }
 
@@ -103,16 +94,13 @@ Future<void> captureException() async {
     print('Capture exception : SentryId: $sentryId');
 
     if (sentryId != SentryId.empty()) {
-      (document.querySelector('#exceptionResult') as HTMLElement?)
-          ?.style
-          .display = 'block';
+      querySelector('#exceptionResult')?.style.display = 'block';
     }
   }
 }
 
 Future<void> captureUnhandledException() async {
-  (document.querySelector('#unhandledResult') as HTMLElement?)?.style.display =
-      'block';
+  querySelector('#unhandledResult')?.style.display = 'block';
 
   await buildCard();
 }
@@ -124,8 +112,7 @@ Future<void> captureCompleteExampleEvent() async {
   print('Response SentryId: $sentryId');
 
   if (sentryId != SentryId.empty()) {
-    (document.querySelector('#eventResult') as HTMLElement?)?.style.display =
-        'block';
+    querySelector('#eventResult')?.style.display = 'block';
   }
 }
 

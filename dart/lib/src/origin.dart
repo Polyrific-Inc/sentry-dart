@@ -1,3 +1,4 @@
-export 'origin_io.dart'
-    if (dart.library.html) 'origin_html.dart'
-    if (dart.library.js_interop) 'origin_web.dart';
+import 'dart:html';
+
+/// request origin, used for browser stacktrace
+String get eventOrigin => '${window.location.origin}/';

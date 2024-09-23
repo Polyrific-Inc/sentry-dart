@@ -5,7 +5,6 @@ import UIKit
 #elseif os(macOS)
 import FlutterMacOS
 import AppKit
-import CoreVideo
 #endif
 
 // swiftlint:disable file_length function_body_length

@@ -11,6 +11,7 @@ import 'time_to_display_tracker.dart';
 
 import '../../sentry_flutter.dart';
 import '../event_processor/flutter_enricher_event_processor.dart';
+import '../native/sentry_native.dart';
 
 // ignore: implementation_imports
 import 'package:sentry/src/sentry_tracer.dart';
@@ -262,8 +263,8 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
       trimEnd: true,
       onFinish: (transaction) async {
         _transaction = null;
-        final nativeFrames =
-            await _native?.endNativeFrames(transaction.context.traceId);
+        final nativeFrames = await _native
+            ?.endNativeFramesCollection(transaction.context.traceId);
         if (nativeFrames != null) {
           final measurements = nativeFrames.toMeasurements();
           for (final item in measurements.entries) {
@@ -292,7 +293,7 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
       scope.span ??= _transaction;
     });
 
-    await _native?.beginNativeFrames();
+    await _native?.beginNativeFramesCollection();
   }
 
   Future<void> _finishTimeToDisplayTracking({bool clearAfter = false}) async {
