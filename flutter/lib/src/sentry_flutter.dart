@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 
@@ -21,6 +20,7 @@ import 'integrations/native_app_start_handler.dart';
 import 'integrations/screenshot_integration.dart';
 import 'native/factory.dart';
 import 'native/native_scope_observer.dart';
+import 'native/sentry_native_binding.dart';
 import 'profiling.dart';
 import 'renderer/renderer.dart';
 import 'span_frame_metrics_collector.dart';
@@ -33,13 +33,22 @@ typedef FlutterOptionsConfiguration = FutureOr<void> Function(
 
 /// Sentry Flutter SDK main entry point
 mixin SentryFlutter {
-  static const _channel = MethodChannel('sentry_flutter');
-
   /// Represents the time when the Sentry init set up has started.
   @internal
   // ignore: invalid_use_of_internal_member
   static DateTime? sentrySetupStartTime;
 
+  /// Initializes the Sentry Flutter SDK.
+  ///
+  /// Unlike [Sentry.init], this method creates the Flutter default integrations.
+  ///
+  /// [optionsConfiguration] is a callback that allows you to configure the Sentry
+  /// options. The [SentryFlutterOptions] should not be adjusted anywhere else than
+  /// during [init], so that's why they're not directly exposed outside of this method.
+  ///
+  /// You can use the static members of [Sentry] from within other packages without the
+  /// need of initializing it in the package; as long as they have been already properly
+  /// initialized in the application package.
   static Future<void> init(
     FlutterOptionsConfiguration optionsConfiguration, {
     AppRunner? appRunner,
@@ -101,15 +110,12 @@ mixin SentryFlutter {
     options.prependExceptionTypeIdentifier(FlutterExceptionTypeIdentifier());
   }
 
-  static Future<void> _initDefaultValues(
-    SentryFlutterOptions options,
-    MethodChannel channel,
-  ) async {
+  static Future<void> _initDefaultValues(SentryFlutterOptions options) async {
     options.addEventProcessor(FlutterExceptionEventProcessor());
 
     // Not all platforms have a native integration.
     if (_native != null) {
-      options.transport = FileSystemTransport(channel, options);
+      options.transport = FileSystemTransport(_native!, options);
       options.addScopeObserver(NativeScopeObserver(_native!));
     }
 
@@ -138,13 +144,11 @@ mixin SentryFlutter {
   /// Install default integrations
   /// https://medium.com/flutter-community/error-handling-in-flutter-98fce88a34f0
   static List<Integration> _createDefaultIntegrations(
-    MethodChannel channel,
     SentryFlutterOptions options,
     bool isOnErrorSupported,
   ) {
     final integrations = <Integration>[];
     final platformChecker = options.platformChecker;
-    final platform = platformChecker.platform;
 
     // Will call WidgetsFlutterBinding.ensureInitialized() before all other integrations.
     integrations.add(WidgetsFlutterBindingIntegration());
@@ -171,18 +175,6 @@ mixin SentryFlutter {
       options.enableDartSymbolication = false;
     }
 
-    // Will enrich events with device context, native packages and integrations
-    if (platformChecker.hasNativeIntegration &&
-        !platformChecker.isWeb &&
-        (platform.isIOS || platform.isMacOS || platform.isAndroid)) {
-      integrations.add(LoadContextsIntegration(channel));
-    }
-
-    if (platformChecker.hasNativeIntegration &&
-        !platformChecker.isWeb &&
-        (platform.isAndroid || platform.isIOS || platform.isMacOS)) {
-      integrations.add(LoadImageListIntegration(channel));
-    }
     final renderer = options.rendererWrapper.getRenderer();
     if (!platformChecker.isWeb || renderer == FlutterRenderer.canvasKit) {
       integrations.add(ScreenshotIntegration());
@@ -274,7 +266,7 @@ mixin SentryFlutter {
   }
 
   @internal
-  static SentryNative? get native => _native;
+  static SentryNativeBinding? get native => _native;
 
   @internal
   static set native(SentryNativeBinding? value) => _native = value;

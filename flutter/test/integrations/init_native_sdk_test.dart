@@ -81,7 +81,7 @@ void main() {
     });
     var sut = fixture.getSut(channel);
 
-    final options = createOptions()
+    fixture.options
       ..debug = false
       ..environment = 'foo'
       ..release = 'foo@bar+1'
@@ -120,8 +120,8 @@ void main() {
       ..experimental.replay.sessionSampleRate = 0.1
       ..experimental.replay.onErrorSampleRate = 0.2;
 
-    options.sdk.addIntegration('foo');
-    options.sdk.addPackage('bar', '1');
+    fixture.options.sdk.addIntegration('foo');
+    fixture.options.sdk.addPackage('bar', '1');
 
     await sut.init(MockHub());
 

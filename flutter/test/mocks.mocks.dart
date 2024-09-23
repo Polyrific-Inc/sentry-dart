@@ -157,8 +157,8 @@ class _FakeMetricsApi_11 extends _i1.SmartFake implements _i5.MetricsApi {
         );
 }
 
-class _FakeHub_12 extends _i1.SmartFake implements _i2.Hub {
-  _FakeHub_12(
+class _FakeScope_12 extends _i1.SmartFake implements _i2.Scope {
+  _FakeScope_12(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -774,6 +774,7 @@ class MockSentryTransaction extends _i1.Mock implements _i2.SentryTransaction {
               #threads: threads,
               #type: type,
               #measurements: measurements,
+              #metricSummaries: metricSummaries,
               #transactionInfo: transactionInfo,
             },
           ),
@@ -1633,7 +1634,7 @@ class MockHub extends _i1.Mock implements _i2.Hub {
   @override
   _i2.Scope get scope => (super.noSuchMethod(
         Invocation.getter(#scope),
-        returnValue: _FakeScope_11(
+        returnValue: _FakeScope_12(
           this,
           Invocation.getter(#scope),
         ),
@@ -1788,7 +1789,7 @@ class MockHub extends _i1.Mock implements _i2.Hub {
           #clone,
           [],
         ),
-        returnValue: _FakeHub_12(
+        returnValue: _FakeHub_13(
           this,
           Invocation.method(
             #clone,
