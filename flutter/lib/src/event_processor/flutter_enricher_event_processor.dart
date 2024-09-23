@@ -7,6 +7,7 @@ import 'package:sentry/sentry.dart';
 
 import '../navigation/sentry_navigator_observer.dart';
 import '../sentry_flutter_options.dart';
+import '../utils/enum_wrapper.dart';
 
 typedef WidgetBindingGetter = WidgetsBinding? Function();
 
