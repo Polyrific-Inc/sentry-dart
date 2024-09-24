@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 
+import 'dart_exception_type_identifier.dart';
+import 'load_dart_debug_images_integration.dart';
 import 'metrics/metrics_api.dart';
 import 'run_zoned_guarded_integration.dart';
 import 'event_processor/enricher/enricher_event_processor.dart';
@@ -82,9 +84,15 @@ class Sentry {
       options.addIntegrationByIndex(0, IsolateErrorIntegration());
     }
 
+    if (options.enableDartSymbolication) {
+      options.addIntegration(LoadDartDebugImagesIntegration());
+    }
+
     options.addEventProcessor(EnricherEventProcessor(options));
     options.addEventProcessor(ExceptionEventProcessor(options));
     options.addEventProcessor(DeduplicationEventProcessor(options));
+
+    options.prependExceptionTypeIdentifier(DartExceptionTypeIdentifier());
   }
 
   /// This method reads available environment variables and uses them

@@ -1,9 +1,13 @@
 package io.sentry.flutter
 
+import android.util.Log
 import io.sentry.SentryLevel
+import io.sentry.SentryOptions.Proxy
+import io.sentry.SentryReplayOptions
 import io.sentry.android.core.BuildConfig
 import io.sentry.android.core.SentryAndroidOptions
 import io.sentry.protocol.SdkVersion
+import java.net.Proxy.Type
 import java.util.Locale
 
 class SentryFlutter(
@@ -61,7 +65,7 @@ class SentryFlutter(
     }
     data.getIfNotNull<String>("diagnosticLevel") {
       if (options.isDebug) {
-        val sentryLevel = SentryLevel.valueOf(it.toUpperCase(Locale.ROOT))
+        val sentryLevel = SentryLevel.valueOf(it.uppercase(Locale.ROOT))
         options.setDiagnosticLevel(sentryLevel)
       }
     }
@@ -119,6 +123,42 @@ class SentryFlutter(
     data.getIfNotNull<Int>("readTimeoutMillis") {
       options.readTimeoutMillis = it
     }
+    data.getIfNotNull<Map<String, Any>>("proxy") { proxyJson ->
+      options.proxy =
+        Proxy()
+          .apply {
+            host = proxyJson["host"] as? String
+            port =
+              (proxyJson["port"] as? Int)
+                ?.let {
+                  "$it"
+                }
+            (proxyJson["type"] as? String)
+              ?.let {
+                type =
+                  try {
+                    Type.valueOf(it.toUpperCase(Locale.ROOT))
+                  } catch (_: IllegalArgumentException) {
+                    Log.w("Sentry", "Could not parse `type` from proxy json: $proxyJson")
+                    null
+                  }
+              }
+            user = proxyJson["user"] as? String
+            pass = proxyJson["pass"] as? String
+          }
+    }
+
+    data.getIfNotNull<Map<String, Any>>("replay") {
+      updateReplayOptions(options.experimental.sessionReplay, it)
+    }
+  }
+
+  fun updateReplayOptions(
+    options: SentryReplayOptions,
+    data: Map<String, Any>,
+  ) {
+    options.sessionSampleRate = data["sessionSampleRate"] as? Double
+    options.errorSampleRate = data["onErrorSampleRate"] as? Double
   }
 }
 

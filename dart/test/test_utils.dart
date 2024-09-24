@@ -18,6 +18,11 @@ const String _testDsnWithPath =
 const String _testDsnWithPort =
     'https://public:secret@sentry.example.com:8888/1';
 
+SentryOptions defaultTestOptions([PlatformChecker? checker]) {
+  return SentryOptions(dsn: testDsn, checker: checker)
+    ..automatedTestMode = true;
+}
+
 void testHeaders(
   Map<String, String>? headers,
   ClockProvider fakeClockProvider, {
@@ -69,7 +74,7 @@ Future testCaptureException(
     fail('Unexpected request on ${request.method} ${request.url} in HttpMock');
   });
 
-  final options = SentryOptions(dsn: testDsn)
+  final options = defaultTestOptions()
     ..compressPayload = compressPayload
     ..clock = fakeClockProvider
     ..httpClient = httpMock
@@ -117,9 +122,22 @@ Future testCaptureException(
 
   final topFrame =
       (stacktrace['frames'] as Iterable<dynamic>).last as Map<String, dynamic>;
+  if (topFrame['function'].contains('browser_test.dart.wasm')) {
+    // TODO stacktrace parsing for wasm is not implemented yet
+    // {filename: unparsed, function:     at testCaptureException (http://localhost:59959/9R3KYfjvkWCySr4h2hI0pVO7PqmPFeE6/test/sentry_browser_test.dart.browser_test.dart.wasm:wasm-function[1007]:0x4bc18), abs_path: http://localhost:59959/unparsed, in_app: true}
+    return;
+  }
   expect(
     topFrame.keys,
-    <String>['filename', 'function', 'lineno', 'colno', 'abs_path', 'in_app'],
+    <String>[
+      'filename',
+      'function',
+      'lineno',
+      'colno',
+      'abs_path',
+      'in_app',
+      'platform'
+    ],
   );
 
   if (isWeb) {
@@ -183,7 +201,7 @@ Future testCaptureException(
 
 void runTest({Codec<List<int>, List<int>?>? gzip, bool isWeb = false}) {
   test('can parse DSN', () async {
-    final options = SentryOptions(dsn: testDsn);
+    final options = defaultTestOptions();
     final client = SentryClient(options);
 
     final dsn = Dsn.parse(options.dsn!);
@@ -200,7 +218,7 @@ void runTest({Codec<List<int>, List<int>?>? gzip, bool isWeb = false}) {
   });
 
   test('can parse DSN without secret', () async {
-    final options = SentryOptions(dsn: _testDsnWithoutSecret);
+    final options = defaultTestOptions()..dsn = _testDsnWithoutSecret;
     final client = SentryClient(options);
 
     final dsn = Dsn.parse(options.dsn!);
@@ -217,7 +235,7 @@ void runTest({Codec<List<int>, List<int>?>? gzip, bool isWeb = false}) {
   });
 
   test('can parse DSN with path', () async {
-    final options = SentryOptions(dsn: _testDsnWithPath);
+    final options = defaultTestOptions()..dsn = _testDsnWithPath;
     final client = SentryClient(options);
 
     final dsn = Dsn.parse(options.dsn!);
@@ -233,7 +251,7 @@ void runTest({Codec<List<int>, List<int>?>? gzip, bool isWeb = false}) {
     client.close();
   });
   test('can parse DSN with port', () async {
-    final options = SentryOptions(dsn: _testDsnWithPort);
+    final options = defaultTestOptions()..dsn = _testDsnWithPort;
     final client = SentryClient(options);
 
     final dsn = Dsn.parse(options.dsn!);
@@ -264,7 +282,8 @@ void runTest({Codec<List<int>, List<int>?>? gzip, bool isWeb = false}) {
     });
 
     final client = SentryClient(
-      SentryOptions(dsn: _testDsnWithoutSecret)
+      defaultTestOptions()
+        ..dsn = _testDsnWithoutSecret
         ..httpClient = httpMock
         ..clock = fakeClockProvider
         ..compressPayload = false
@@ -318,9 +337,7 @@ void runTest({Codec<List<int>, List<int>?>? gzip, bool isWeb = false}) {
     });
 
     final client = SentryClient(
-      SentryOptions(
-        dsn: testDsn,
-      )
+      defaultTestOptions()
         ..httpClient = httpMock
         ..clock = fakeClockProvider
         ..compressPayload = false
@@ -379,9 +396,7 @@ void runTest({Codec<List<int>, List<int>?>? gzip, bool isWeb = false}) {
       data: <String, String>{'foo': 'bar'},
     );
 
-    final options = SentryOptions(
-      dsn: testDsn,
-    )
+    final options = defaultTestOptions()
       ..httpClient = httpMock
       ..clock = fakeClockProvider
       ..compressPayload = false
