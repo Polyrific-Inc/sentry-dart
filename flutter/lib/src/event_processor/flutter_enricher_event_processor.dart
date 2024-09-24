@@ -7,7 +7,6 @@ import 'package:sentry/sentry.dart';
 
 import '../navigation/sentry_navigator_observer.dart';
 import '../sentry_flutter_options.dart';
-import '../utils/enum_wrapper.dart';
 
 typedef WidgetBindingGetter = WidgetsBinding? Function();
 
@@ -140,16 +139,15 @@ class FlutterEnricherEventProcessor implements EventProcessor {
     return <String, String>{
       'has_render_view': hasRenderView.toString(),
       if (tempDebugBrightnessOverride != null)
-        'debug_brightness_override': pDescribeEnum(tempDebugBrightnessOverride),
+        'debug_brightness_override': tempDebugBrightnessOverride.name,
       if (debugPlatformOverride != null)
-        'debug_default_target_platform_override':
-            pDescribeEnum(debugPlatformOverride),
+        'debug_default_target_platform_override': debugPlatformOverride.name,
       if (initialLifecycleState != null && initialLifecycleState.isNotEmpty)
         'initial_lifecycle_state': initialLifecycleState,
       if (defaultRouteName != null && defaultRouteName.isNotEmpty)
         'default_route_name': defaultRouteName,
       if (currentLifecycle != null)
-        'current_lifecycle_state': pDescribeEnum(currentLifecycle),
+        'current_lifecycle_state': currentLifecycle.name,
       // Seems to always return false.
       // Also always fails in tests.
       // See https://github.com/flutter/flutter/issues/83919
@@ -197,7 +195,7 @@ class FlutterEnricherEventProcessor implements EventProcessor {
   SentryOperatingSystem _getOperatingSystem(SentryOperatingSystem? os) {
     return (os ?? SentryOperatingSystem()).copyWith(
       // ignore: deprecated_member_use
-      theme: os?.theme ?? pDescribeEnum(window.platformBrightness),
+      theme: os?.theme ?? describeEnum(window.platformBrightness),
     );
   }
 

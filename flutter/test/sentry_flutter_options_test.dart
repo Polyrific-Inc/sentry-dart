@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:sentry_flutter/src/sentry_flutter_options.dart';
 
 import 'mocks.dart';
 
@@ -6,8 +8,8 @@ void main() {
   group('SentryFlutterOptions', () {
     testWidgets('auto breadcrumb tracking: has native integration',
         (WidgetTester tester) async {
-      final options =
-          defaultTestOptions(MockPlatformChecker(hasNativeIntegration: true));
+      final options = SentryFlutterOptions(
+          checker: MockPlatformChecker(hasNativeIntegration: true));
 
       expect(options.enableAppLifecycleBreadcrumbs, isFalse);
       expect(options.enableWindowMetricBreadcrumbs, isFalse);
@@ -19,8 +21,8 @@ void main() {
 
     testWidgets('auto breadcrumb tracking: without native integration',
         (WidgetTester tester) async {
-      final options =
-          defaultTestOptions(MockPlatformChecker(hasNativeIntegration: false));
+      final options = SentryFlutterOptions(
+          checker: MockPlatformChecker(hasNativeIntegration: false));
 
       expect(options.enableAppLifecycleBreadcrumbs, isTrue);
       expect(options.enableWindowMetricBreadcrumbs, isTrue);
@@ -31,7 +33,7 @@ void main() {
     });
 
     testWidgets('useNativeBreadcrumbTracking', (WidgetTester tester) async {
-      final options = defaultTestOptions();
+      final options = SentryFlutterOptions();
       options.useNativeBreadcrumbTracking();
 
       expect(options.enableAppLifecycleBreadcrumbs, isFalse);
@@ -43,7 +45,7 @@ void main() {
     });
 
     testWidgets('useFlutterBreadcrumbTracking', (WidgetTester tester) async {
-      final options = defaultTestOptions();
+      final options = SentryFlutterOptions();
       options.useFlutterBreadcrumbTracking();
 
       expect(options.enableAppLifecycleBreadcrumbs, isTrue);

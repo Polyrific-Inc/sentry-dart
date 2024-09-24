@@ -24,18 +24,9 @@ void main() {
       verify(fixture.binding.init(any)).called(1);
     });
 
-    test('does not throw', () async {
-      fixture.options.automatedTestMode = false;
-
+    test('do not throw', () async {
       fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
       await fixture.registerIntegration();
-      expect(fixture.options.sdk.integrations.contains('nativeSdkIntegration'),
-          false);
-    });
-
-    test('rethrows in tests', () async {
-      fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
-      expect(fixture.registerIntegration, throwsException);
       expect(fixture.options.sdk.integrations.contains('nativeSdkIntegration'),
           false);
     });
@@ -59,9 +50,9 @@ void main() {
       verifyNever(fixture.binding.close());
     });
 
-    test('is not added in case of an exception', () async {
+    test(' is not added in case of an exception', () async {
       fixture.sut = NativeSdkIntegration(_ThrowingMockSentryNative());
-      expect(fixture.registerIntegration, throwsException);
+      await fixture.registerIntegration();
       expect(fixture.options.sdk.integrations, <String>[]);
     });
   });

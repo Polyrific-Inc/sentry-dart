@@ -17,11 +17,11 @@ void main() {
     setUp(() {
       TestWidgetsFlutterBinding.ensureInitialized();
 
-      flutterTrackingEnabledOptions = defaultTestOptions()
+      flutterTrackingEnabledOptions = SentryFlutterOptions()
         ..bindingUtils = TestBindingWrapper();
       flutterTrackingEnabledOptions.useFlutterBreadcrumbTracking();
 
-      flutterTrackingDisabledOptions = defaultTestOptions()
+      flutterTrackingDisabledOptions = SentryFlutterOptions()
         ..bindingUtils = TestBindingWrapper();
       flutterTrackingDisabledOptions.useNativeBreadcrumbTracking();
     });

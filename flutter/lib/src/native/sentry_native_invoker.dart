@@ -15,6 +15,7 @@ mixin SentryNativeSafeInvoker {
       return await fn();
     } catch (error, stackTrace) {
       _logError(nativeMethodName, error, stackTrace);
+      // ignore: invalid_use_of_internal_member
       if (options.automatedTestMode) {
         rethrow;
       }
@@ -27,6 +28,7 @@ mixin SentryNativeSafeInvoker {
       return fn();
     } catch (error, stackTrace) {
       _logError(nativeMethodName, error, stackTrace);
+      // ignore: invalid_use_of_internal_member
       if (options.automatedTestMode) {
         rethrow;
       }

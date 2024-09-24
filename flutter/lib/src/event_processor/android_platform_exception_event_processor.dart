@@ -58,9 +58,6 @@ class AndroidPlatformExceptionEventProcessor implements EventProcessor {
         exception: e,
         stackTrace: stackTrace,
       );
-      if (_options.automatedTestMode) {
-        rethrow;
-      }
       return event;
     }
   }

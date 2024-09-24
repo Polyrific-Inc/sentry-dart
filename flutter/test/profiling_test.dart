@@ -19,7 +19,7 @@ void main() {
 
   group('$SentryNativeProfilerFactory', () {
     Hub hubWithSampleRate(double profilesSampleRate) {
-      final o = defaultTestOptions();
+      final o = SentryFlutterOptions(dsn: fakeDsn);
       o.platformChecker = getPlatformChecker(platform: MockPlatform.iOs());
       o.profilesSampleRate = profilesSampleRate;
 
