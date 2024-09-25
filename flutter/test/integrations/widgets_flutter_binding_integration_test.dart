@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_flutter/src/integrations/widgets_flutter_binding_integration.dart';
 
 import '../mocks.dart';
@@ -42,7 +43,8 @@ void main() {
 class Fixture {
   final hub = MockHub();
 
-  final options = defaultTestOptions()..bindingUtils = TestBindingWrapper();
+  final options = SentryFlutterOptions(dsn: fakeDsn)
+    ..bindingUtils = TestBindingWrapper();
 
   TestBindingWrapper get testBindingUtils =>
       options.bindingUtils as TestBindingWrapper;

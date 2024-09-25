@@ -57,14 +57,17 @@ void main() {
         replayDir = fs.directory(replayConfig['directory'])
           ..createSync(recursive: true);
 
+        options = defaultTestOptions()
+          ..platformChecker = MockPlatformChecker(mockPlatform: mockPlatform)
+          ..fileSystem = fs;
+
         native = NativeChannelFixture();
+        when(native.handler('initNativeSdk', any))
+            .thenAnswer((_) => Future.value());
+        when(native.handler('closeNativeSdk', any))
+            .thenAnswer((_) => Future.value());
 
-        options =
-            defaultTestOptions(MockPlatformChecker(mockPlatform: mockPlatform))
-              ..fileSystem = fs
-              ..methodChannel = native.channel;
-
-        sut = createBinding(options);
+        sut = createBinding(options, channel: native.channel);
       });
 
       tearDown(() async {

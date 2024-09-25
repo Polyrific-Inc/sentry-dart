@@ -209,7 +209,8 @@ class Fixture {
     name: 'main',
   );
 
-  SentryFlutterOptions options = defaultTestOptions()..attachThreads = true;
+  SentryFlutterOptions options = SentryFlutterOptions(dsn: fakeDsn)
+    ..attachThreads = true;
 }
 
 final detailsAndStackTracePlatformException = PlatformException(

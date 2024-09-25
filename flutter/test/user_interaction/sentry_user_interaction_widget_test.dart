@@ -524,7 +524,7 @@ Future<void> tapMe(
 }
 
 class Fixture {
-  final _options = defaultTestOptions();
+  final _options = SentryFlutterOptions(dsn: fakeDsn);
   final _transport = MockTransport();
   late Hub hub;
 

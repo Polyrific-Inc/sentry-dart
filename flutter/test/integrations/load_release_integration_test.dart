@@ -143,7 +143,7 @@ void main() {
 }
 
 class Fixture {
-  final options = defaultTestOptions();
+  final options = SentryFlutterOptions(dsn: fakeDsn);
 
   LoadReleaseIntegration getIntegration({Function? loader}) {
     if (loader != null) {
