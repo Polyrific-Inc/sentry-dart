@@ -516,7 +516,7 @@ void main() {
 }
 
 class Fixture {
-  final _options = defaultTestOptions();
+  final _options = SentryOptions(dsn: fakeDsn);
   late Hub _hub;
   final transport = MockTransport();
   final assetBundle = TestAssetBundle();

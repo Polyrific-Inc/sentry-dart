@@ -6,7 +6,6 @@ import 'package:mockito/mockito.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_flutter/src/integrations/load_contexts_integration.dart';
 
-import '../mocks.dart';
 import '../mocks.mocks.dart';
 
 void main() {
@@ -425,7 +424,7 @@ void main() {
 
 class Fixture {
   final hub = MockHub();
-  final options = defaultTestOptions();
+  final options = SentryFlutterOptions();
   final binding = MockSentryNativeBinding();
 
   LoadContextsIntegration getSut(

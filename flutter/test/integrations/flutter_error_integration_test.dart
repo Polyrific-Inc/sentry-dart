@@ -269,14 +269,6 @@ void main() {
 
       final hub = Hub(fixture.options);
       final client = MockSentryClient();
-      when(client.captureEvent(any,
-              scope: anyNamed('scope'),
-              stackTrace: anyNamed('stackTrace'),
-              hint: anyNamed('hint')))
-          .thenAnswer((_) => Future.value(SentryId.newId()));
-      when(client.captureTransaction(any,
-              scope: anyNamed('scope'), traceContext: anyNamed('traceContext')))
-          .thenAnswer((_) => Future.value(SentryId.newId()));
       hub.bindClient(client);
 
       final sut = fixture.getSut();
@@ -315,7 +307,7 @@ void main() {
 
 class Fixture {
   final hub = MockHub();
-  final options = defaultTestOptions()..tracesSampleRate = 1.0;
+  final options = SentryFlutterOptions(dsn: fakeDsn)..tracesSampleRate = 1.0;
 
   FlutterErrorIntegration getSut() {
     return FlutterErrorIntegration();

@@ -212,9 +212,6 @@ class _LoadContextsIntegrationEventProcessor implements EventProcessor {
         exception: exception,
         stackTrace: stackTrace,
       );
-      if (_options.automatedTestMode) {
-        rethrow;
-      }
     }
     return event;
   }

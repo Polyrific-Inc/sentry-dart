@@ -262,7 +262,7 @@ void main() {
 }
 
 class Fixture {
-  final options = defaultTestOptions();
+  final options = SentryFlutterOptions(dsn: fakeDsn);
   late final hub = Hub(options);
   final fakeFrameCallbackHandler = FakeFrameCallbackHandler();
   final mockSentryNative = MockSentryNativeBinding();

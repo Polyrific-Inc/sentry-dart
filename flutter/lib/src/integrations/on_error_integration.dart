@@ -143,9 +143,6 @@ class PlatformDispatcherWrapper {
         exception: exception,
         stackTrace: stacktrace,
       );
-      if (options.automatedTestMode) {
-        rethrow;
-      }
       return false;
     }
     return true;

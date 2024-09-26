@@ -10,22 +10,52 @@ import 'mocks.dart';
 // https://github.com/getsentry/sentry-dart/issues/508
 // There are no asserts, test are succesfull if no exceptions are thrown.
 void main() {
-  final native = NativeChannelFixture();
-
-  void optionsInitializer(SentryFlutterOptions options) {
-    // LoadReleaseIntegration throws because package_info channel is not available
-    options.removeIntegration(
-        options.integrations.firstWhere((i) => i is LoadReleaseIntegration));
-  }
+  setUp(() async {
+    await Sentry.close();
+  });
 
   test('async re-initilization', () async {
-    await SentryFlutter.init(optionsInitializer,
-        options: defaultTestOptions()..methodChannel = native.channel);
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = fakeDsn;
+        // ignore: invalid_use_of_internal_member
+        options.automatedTestMode = true;
+      },
+    );
 
     await Sentry.close();
 
-    await SentryFlutter.init(optionsInitializer,
-        options: defaultTestOptions()..methodChannel = native.channel);
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = fakeDsn;
+        // ignore: invalid_use_of_internal_member
+        options.automatedTestMode = true;
+      },
+    );
+
+    await Sentry.close();
+  });
+
+  // This is the failure from
+  // https://github.com/getsentry/sentry-dart/issues/508
+  test('re-initilization', () async {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = fakeDsn;
+        // ignore: invalid_use_of_internal_member
+        options.automatedTestMode = true;
+      },
+    );
+
+    await Sentry.close();
+
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = fakeDsn;
+        // ignore: invalid_use_of_internal_member
+        options.automatedTestMode = true;
+      },
+    );
 
     await Sentry.close();
   });
