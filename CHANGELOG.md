@@ -12,6 +12,12 @@
   - Fixes ([#2103](https://github.com/getsentry/sentry-dart/issues/2103))
   - Fixes ([#2233](https://github.com/getsentry/sentry-dart/issues/2233))
 
+### Dependencies
+
+- Bump Cocoa SDK from v8.36.0 to v8.37.0 ([#29](https://github.com/Polyrific-Inc/sentry-dart/pull/29))
+  - [changelog](https://github.com/getsentry/sentry-cocoa/blob/main/CHANGELOG.md#8370)
+  - [diff](https://github.com/getsentry/sentry-cocoa/compare/8.36.0...8.37.0)
+
 ## 8.9.0
 
 ### Features
