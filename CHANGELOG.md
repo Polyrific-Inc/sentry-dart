@@ -12,6 +12,12 @@
   - Fixes ([#2103](https://github.com/getsentry/sentry-dart/issues/2103))
   - Fixes ([#2233](https://github.com/getsentry/sentry-dart/issues/2233))
 
+### Dependencies
+
+- Bump Android SDK from v7.14.0 to v7.20.0 ([#37](https://github.com/Polyrific-Inc/sentry-dart/pull/37))
+  - [changelog](https://github.com/getsentry/sentry-java/blob/main/CHANGELOG.md#7200)
+  - [diff](https://github.com/getsentry/sentry-java/compare/7.14.0...7.20.0)
+
 ## 8.9.0
 
 ### Features
